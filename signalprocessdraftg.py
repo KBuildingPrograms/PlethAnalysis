@@ -2,24 +2,37 @@ import numpy as np
 from sklearn import svm
 from scipy.integrate import trapz
 import matplotlib as plt
-import cv2
 import pandas as pd
-import xlrd
+
+
+class Apnea:
+    def __init__(self,type,start_time,end_time):
+        self.duration = start_time - end_time
+        self.start_time = start_time
+        self.type = type
+    
+class Yawn:
+    def __init__(self,start_time,end_time):
+        self.duration = start_time - end_time
+        self.start_time = start_time
+
+
 #im probably going to need to narrow these libraries when I get the chance
 #I think apneas can be saved as dicts
     #apnea = {"start time": x, "duration": [y]}
 
 chunk_value = 20
-sampling_interval = 0
+sampling_interval = 2000
 Nrows = chunk_value * sampling_interval + (sampling_interval * 3600) #skip the first hour
-pleth_graph_excel = input()
+pleth_graph_ascii = input()
 #dtype = np.float64
     #this may change based on how time is listed in the excel file
     #actually i can just ignore that column if need be, or use parse date-time
 #specify columns based on how the final data generates
 #check the .xls type to determine engine
 #nrows = sampling interval per second * 20
-pleth_section = pd.read_excel(pleth_graph_excel, dtype=np.float64 ,nrows=Nrows) 
+pleth_section = pd.read_csv(pleth_graph_ascii, sep="\s+",) 
+print(pleth_section)
     #returns a dataframe
 
 
