@@ -31,7 +31,7 @@ pleth_graph_ascii = input()
 #specify columns based on how the final data generates
 #check the .xls type to determine engine
 #nrows = sampling interval per second * 20
-pleth_section = pd.read_csv(pleth_graph_ascii, sep="\s+",) 
+pleth_section = pd.read_csv(pleth_graph_ascii, sep="\s+",index_col=False,nrows=Nrows) 
 print(pleth_section)
     #returns a dataframe
 
