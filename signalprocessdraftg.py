@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn import svm
-from scipy.integrate import trapz
+import scipy.integrate
 import matplotlib as plt
 import pandas as pd
 
@@ -23,15 +23,16 @@ class Yawn:
 
 chunk_value = 20
 sampling_interval = 2000
-Nrows = chunk_value * sampling_interval + (sampling_interval * 3600) #skip the first hour
-pleth_graph_ascii = input()
+Nrows = chunk_value * sampling_interval #total number of rows
+skip_rows = sampling_interval * 3600 #THIS skips the first hour
+pleth_graph_ascii = "E283K Pleth 137-139 ASCII file.ascii"
 #dtype = np.float64
     #this may change based on how time is listed in the excel file
     #actually i can just ignore that column if need be, or use parse date-time
 #specify columns based on how the final data generates
 #check the .xls type to determine engine
 #nrows = sampling interval per second * 20
-pleth_section = pd.read_csv(pleth_graph_ascii, sep="\s+",index_col=False,nrows=Nrows) 
+pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skip_rows, nrows=Nrows, low_memory=False) 
 print(pleth_section)
     #returns a dataframe
 
