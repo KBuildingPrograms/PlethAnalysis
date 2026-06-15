@@ -41,24 +41,29 @@ pleth_section.plot(x="Time",y="Flow")
 plt.show()
 #shows the plot of flow
 
-#take the first half
-pleth_ten_section = pleth_section.head(len(pleth_section) // 2).copy() #bruh this is still randomizing
-pleth_ten_section.plot(x="Time",y="Flow")
-plt.show()
-
 #define the baseline 
 base_flow = -16.4 #probably won't need this after normalization lmao
 #normalize the signal (probably z-score)
-normalized_ps = pleth_ten_section.copy()
-normalized_ps["Flow"] = (pleth_ten_section["Flow"]-pleth_ten_section["Flow"].mean())/pleth_ten_section["Flow"].std()
+normalized_ps = pleth_section.copy()
+normalized_ps["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 print(normalized_ps)
-    #plot the section using the dataframe plot or matplotlib
+
+#take the first half
+pleth_ten_section = normalized_ps.head(len(normalized_ps) // 2).copy() 
+pleth_ten_section.plot(x="Time",y="Flow")
+plt.show()
+
 #take the derivative of the data
+pts_gradient = pleth_ten_section.copy()
+pts_gradient["Flow"] = pts_gradient["Flow"].pct_change
+print(pts_gradient)
     #either df.pct_change() or np.gradient()
     #plot the gradient to check it
 
 
 #Collect the local maximums of a certain height within the first 10 seconds
+ptsg_zeros = pts_gradient.loc[pts_gradient["Flow"] <= 0.000020]
+print(ptsg_zeros)
     #probably can check all data above N std deviation above the mean and take the peaks with the gradient graph
     #so take the maxs using the gradient, if that point on the regular graph meets the minimum height requirement, sae it
     #noting the start and end of those maximums too 
