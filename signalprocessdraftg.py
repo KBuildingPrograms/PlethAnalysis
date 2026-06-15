@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn import svm
 import scipy.integrate
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import pandas as pd
 
 
@@ -25,23 +25,33 @@ chunk_value = 20
 sampling_interval = 2000
 Nrows = chunk_value * sampling_interval #total number of rows
 skip_rows = sampling_interval * 3600 #THIS skips the first hour
-pleth_graph_ascii = "E283K Pleth 137-139 ASCII file.ascii"
+print("Paste the file location of the pleth ASCII (no headings, no quotation marks)")
+pleth_location = input()
+pleth_graph_ascii = pleth_location
 #dtype = np.float64
     #this may change based on how time is listed in the excel file
     #actually i can just ignore that column if need be, or use parse date-time
 #specify columns based on how the final data generates
 #check the .xls type to determine engine
 #nrows = sampling interval per second * 20
-pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skip_rows, nrows=Nrows, low_memory=False) 
+pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skip_rows, nrows=Nrows, low_memory=False, header=0, names=["Time","Flow"]) 
 print(pleth_section)
     #returns a dataframe
-
+pleth_section.plot(x="Time",y="Flow")
+plt.show()
+#shows the plot of flow
 
 #take the first half
-pleth_ten_section = pleth_section.sample(frac=0.5)
+pleth_ten_section = pleth_section.head(len(pleth_section) // 2).copy() #bruh this is still randomizing
+pleth_ten_section.plot(x="Time",y="Flow")
+plt.show()
 
 #define the baseline 
+base_flow = -16.4 #probably won't need this after normalization lmao
 #normalize the signal (probably z-score)
+normalized_ps = pleth_ten_section.copy()
+normalized_ps["Flow"] = (pleth_ten_section["Flow"]-pleth_ten_section["Flow"].mean())/pleth_ten_section["Flow"].std()
+print(normalized_ps)
     #plot the section using the dataframe plot or matplotlib
 #take the derivative of the data
     #either df.pct_change() or np.gradient()
