@@ -37,8 +37,8 @@ pleth_graph_ascii = pleth_location
 pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skip_rows, nrows=Nrows, low_memory=False, header=0, names=["Time","Flow"]) 
 print(pleth_section)
     #returns a dataframe
-pleth_section.plot(x="Time",y="Flow")
-plt.show()
+#pleth_section.plot(x="Time",y="Flow")
+#plt.show()
 #shows the plot of flow
 
 #define the baseline 
@@ -46,24 +46,21 @@ base_flow = -16.4 #probably won't need this after normalization lmao
 #normalize the signal (probably z-score)
 normalized_ps = pleth_section.copy()
 normalized_ps["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
-print(normalized_ps)
+#print(normalized_ps)
 
 #take the first half
 pleth_ten_section = normalized_ps.head(len(normalized_ps) // 2).copy() 
 pleth_ten_section.plot(x="Time",y="Flow")
-plt.show()
+print(pleth_ten_section)
+#plt.show()
 
-#take the derivative of the data
-pts_gradient = pleth_ten_section.copy()
-pts_gradient["Flow"] = pts_gradient["Flow"].pct_change
-print(pts_gradient)
-    #either df.pct_change() or np.gradient()
-    #plot the gradient to check it
+#I don't think I need the gradient anymore, but, if it's needed later use np.gradient
 
 
 #Collect the local maximums of a certain height within the first 10 seconds
-ptsg_zeros = pts_gradient.loc[pts_gradient["Flow"] <= 0.000020]
-print(ptsg_zeros)
+plt.axhspan(1.1*pleth_ten_section['Flow'].std(), 5*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
+plt.axhspan(-2*pleth_ten_section['Flow'].std(),0,color='yellow',alpha=0.3)
+plt.show()
     #probably can check all data above N std deviation above the mean and take the peaks with the gradient graph
     #so take the maxs using the gradient, if that point on the regular graph meets the minimum height requirement, sae it
     #noting the start and end of those maximums too 
