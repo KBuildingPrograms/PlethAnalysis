@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn import svm
-import scipy.integrate
+from scipy import signal as scp
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -11,7 +11,7 @@ class Apnea:
         self.start_time = start_time
         self.type = type
     
-class Yawn:
+class Sigh:
     def __init__(self,start_time,end_time):
         self.duration = start_time - end_time
         self.start_time = start_time
@@ -59,7 +59,11 @@ print(pleth_ten_section)
 
 #Collect the local maximums of a certain height within the first 10 seconds
 plt.axhspan(1.1*pleth_ten_section['Flow'].std(), 5*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
-plt.axhspan(-2*pleth_ten_section['Flow'].std(),0,color='yellow',alpha=0.3)
+pts_peaks_tp = scp.find_peaks(pleth_ten_section["Flow"], height=1.1*pleth_ten_section['Flow'].std())
+pts_peaks_loc = pts_peaks_tp[0]*0.0005 + 3600
+pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
+print(pts_peaks_height)
+plt.plot(pts_peaks_loc,pts_peaks_height,"x")
 plt.show()
     #probably can check all data above N std deviation above the mean and take the peaks with the gradient graph
     #so take the maxs using the gradient, if that point on the regular graph meets the minimum height requirement, sae it
