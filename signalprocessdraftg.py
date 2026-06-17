@@ -1,5 +1,6 @@
 from scipy import signal as scp
 from scipy.integrate import trapezoid
+import scipy.ndimage as scn
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -13,12 +14,12 @@ class Apnea:
         print(f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}")
     
 class Sigh:
-    def __init__(self,start_time,end_time):
-        self.duration = start_time - end_time
+    def __init__(self,start_time,duration):
+        self.duration = duration
         self.start_time = start_time
     def print(self): #defining because it's useful for checking things
         print(f"Duration: {self.duration}, Start: {self.start_time}")
-
+   
 
 #im probably going to need to narrow these libraries when I get the chance
 #I think apneas can be saved as dicts
@@ -27,7 +28,7 @@ class Sigh:
 chunk_value = 20
 sampling_interval = 2000
 Nrows = chunk_value * sampling_interval #total number of rows
-skip_rows = sampling_interval * 3600 #THIS skips the first hour
+skip_rows = sampling_interval * 3600 #THIS skips the first hour, this has to update in the final version
 print("Paste the file location of the pleth ASCII (no headings, no quotation marks)")
 pleth_location = input()
 pleth_graph_ascii = pleth_location
@@ -38,7 +39,6 @@ pleth_graph_ascii = pleth_location
 #check the .xls type to determine engine
 #nrows = sampling interval per second * 20
 pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skip_rows, nrows=Nrows, low_memory=False, header=0, names=["Time","Flow"]) 
-print(pleth_section)
     #returns a dataframe
 #pleth_section.plot(x="Time",y="Flow")
 #plt.show()
@@ -53,8 +53,11 @@ normalized_ps["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/ple
 
 #take the first half
 pleth_ten_section = normalized_ps.head(len(normalized_ps) // 2).copy() 
+#ok, bandpass filters do NOT work
+smoother = scp.butter(4, 6, fs=2000, output='sos')
+smoothed_signal = scp.sosfilt(smoother, pleth_ten_section['Flow'])
+plt.plot(pleth_ten_section["Time"], smoothed_signal, color='green')
 pleth_ten_section.plot(x="Time",y="Flow")
-print(pleth_ten_section)
 #plt.show()
 
 #I don't think I need the gradient anymore, but, if it's needed later use np.gradient
@@ -64,45 +67,52 @@ print(pleth_ten_section)
 pts_peaks_tp = scp.find_peaks(pleth_ten_section["Flow"], height=1.1*pleth_ten_section['Flow'].std())
 pts_peaks_loc = pts_peaks_tp[0]*0.0005 + 3600
 pts_peaks_w =scp.peak_widths(pleth_ten_section["Flow"], pts_peaks_tp[0])
-print(pts_peaks_w)
 pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
-pts_peaks_width = pts_peaks_w[0]*0.0005
-#plt.plot(pts_peaks_loc,pts_peaks_height,"x")
+pts_peaks_width = pts_peaks_w[0]*0.0005 
+pts_peaks_start = pts_peaks_w[2]*0.0005 + 3600
+plt.plot(pts_peaks_loc,pts_peaks_height,"x") #I need a way to specify to calculate the widths of the peaks I already selected
+    #maybe comparing the peaks found by peak_withs and the peaks found by find_peaks and removing all the ones that don't match
+    #I think I need to filter BEFORE sigh check
+    #I KNOW THE OTHER PROBLEM, I LITERALLY FORGOT TO DO LENGTH TIMES WIDTH OH MY GOD
 
-    #probably can check all data above N std deviation above the mean and take the peaks with the gradient graph
-    #so take the maxs using the gradient, if that point on the regular graph meets the minimum height requirement, sae it
-    #noting the start and end of those maximums too 
 
-#take the area under the maximums using their starts and ends
-    #save that data too
-
-#take the average of the maximum heights and average of maximum areas
+ 
 
 #Sigh check:
-sighs = pd.DataFrame(columns=['Time','Height','Width'])
-ptsp_data = {'Time': pts_peaks_loc, 'Height': pts_peaks_height, 'Width': pts_peaks_width}
+sighs = []
+new_sigh = None
+ptsp_data = {'Time': pts_peaks_loc, 'Height': pts_peaks_height, 'Width': pts_peaks_width, 'Start': pts_peaks_start}
 ptsp_dataframe = pd.DataFrame(data=ptsp_data)
 
 
 ptsp_dataframe=ptsp_dataframe.sort_values(by='Height',ascending=False)
 ptsp_mean = ptsp_dataframe['Height'].mean()
-ptsp_area_mean = ptsp_dataframe['Width'].mean()
+ptsp_area_mean = ptsp_dataframe['Width'].mean() * ptsp_dataframe['Height'].mean()
+print(ptsp_area_mean)
 
 for index, row in ptsp_dataframe.iterrows(): #going through all the peaks
     if row['Height'] > 1.25*ptsp_mean: #basis definition for a sigh
-        if row['Width'] > 2.25*ptsp_area_mean: #other definition for a sigh
-            sighs.concat(row) #I'm going to fix this to fit the sigh object soon
+        print(row)
+        if row['Width'] > 0.7*ptsp_area_mean: #other definition for a sigh
+            new_sigh = Sigh(row['Start'],row['Width'])
+            print(new_sigh)
+            sighs.append(new_sigh)
+            
+            
 
 #using lpf to see if we can isolate apneas, they tend to be high frequency
-lpf = scp.butter(1, 6, fs=2000, output='sos')
-pts_filtered = scp.sosfilt(lpf, pleth_ten_section['Flow'])
-plt.plot(pleth_ten_section['Time'], pts_filtered)
+
+
 plt.axhspan(-2*pleth_ten_section['Flow'].std(), 0.3*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
+try:
+    plt.axvspan(getattr(new_sigh, "start_time"), getattr(new_sigh, "start_time") + getattr(new_sigh, "duration"), color='blue', alpha=0.3 )
+except:
+    pass
 plt.show()
 
 #Got sighs? apnea check
 if len(sighs) >= 1:
-    for index, sigh in sighs:
+    for sigh in sighs:
         #something, something, checking for apneas
         #note the sigh then expand 10 seconds out from the sigh
         #breaths within a certain std dev after that sigh? that period last at or more than 0.8 seconds? call it type 2
