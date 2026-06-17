@@ -1,20 +1,23 @@
-import numpy as np
-from sklearn import svm
 from scipy import signal as scp
+from scipy.integrate import trapezoid
 import matplotlib.pyplot as plt
 import pandas as pd
 
 
 class Apnea:
     def __init__(self,type,start_time,end_time):
-        self.duration = start_time - end_time
+        self.duration = start_time - end_time #need to update to fit list type 
         self.start_time = start_time
         self.type = type
+    def print(self):
+        print(f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}")
     
 class Sigh:
     def __init__(self,start_time,end_time):
         self.duration = start_time - end_time
         self.start_time = start_time
+    def print(self): #defining because it's useful for checking things
+        print(f"Duration: {self.duration}, Start: {self.start_time}")
 
 
 #im probably going to need to narrow these libraries when I get the chance
@@ -58,13 +61,14 @@ print(pleth_ten_section)
 
 
 #Collect the local maximums of a certain height within the first 10 seconds
-plt.axhspan(1.1*pleth_ten_section['Flow'].std(), 5*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
 pts_peaks_tp = scp.find_peaks(pleth_ten_section["Flow"], height=1.1*pleth_ten_section['Flow'].std())
 pts_peaks_loc = pts_peaks_tp[0]*0.0005 + 3600
+pts_peaks_w =scp.peak_widths(pleth_ten_section["Flow"], pts_peaks_tp[0])
+print(pts_peaks_w)
 pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
-print(pts_peaks_height)
-plt.plot(pts_peaks_loc,pts_peaks_height,"x")
-plt.show()
+pts_peaks_width = pts_peaks_w[0]*0.0005
+#plt.plot(pts_peaks_loc,pts_peaks_height,"x")
+
     #probably can check all data above N std deviation above the mean and take the peaks with the gradient graph
     #so take the maxs using the gradient, if that point on the regular graph meets the minimum height requirement, sae it
     #noting the start and end of those maximums too 
@@ -74,23 +78,46 @@ plt.show()
 
 #take the average of the maximum heights and average of maximum areas
 
-#Yawn check: 
-    #find a minimum that is ~25% taller than the average minimum
-        #check if its area is 120%+ greater than the average area
-            #if so, yawn confirmed! add it to the yawn counter
+#Sigh check:
+sighs = pd.DataFrame(columns=['Time','Height','Width'])
+ptsp_data = {'Time': pts_peaks_loc, 'Height': pts_peaks_height, 'Width': pts_peaks_width}
+ptsp_dataframe = pd.DataFrame(data=ptsp_data)
 
-#Apnea checks are where I think I'd like to use SVM the most
-#Got yawns? apnea check
-    #note the yawn then expand 10 seconds out from the yawn
-    #breaths within a certain std dev after that yawn? that period last at or more than 0.8 seconds? call it type 2
-    #apnea pattern appears not directly after the yawn? call it type 1
 
-#No yawns? type 3 check
-    #same type of apnea check in terms of looking for *very small breaths* over 0.8 seconds
-    #if there's an apnea, call it, and label it type 3
+ptsp_dataframe=ptsp_dataframe.sort_values(by='Height',ascending=False)
+ptsp_mean = ptsp_dataframe['Height'].mean()
+ptsp_area_mean = ptsp_dataframe['Width'].mean()
 
+for index, row in ptsp_dataframe.iterrows(): #going through all the peaks
+    if row['Height'] > 1.25*ptsp_mean: #basis definition for a sigh
+        if row['Width'] > 2.25*ptsp_area_mean: #other definition for a sigh
+            sighs.concat(row) #I'm going to fix this to fit the sigh object soon
+
+#using lpf to see if we can isolate apneas, they tend to be high frequency
+lpf = scp.butter(1, 6, fs=2000, output='sos')
+pts_filtered = scp.sosfilt(lpf, pleth_ten_section['Flow'])
+plt.plot(pleth_ten_section['Time'], pts_filtered)
+plt.axhspan(-2*pleth_ten_section['Flow'].std(), 0.3*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
+plt.show()
+
+#Got sighs? apnea check
+if len(sighs) >= 1:
+    for index, sigh in sighs:
+        #something, something, checking for apneas
+        #note the sigh then expand 10 seconds out from the sigh
+        #breaths within a certain std dev after that sigh? that period last at or more than 0.8 seconds? call it type 2
+        #apnea pattern appears not directly after the sigh? call it type 1
+            #differentiating between type 1 & 2 does not matter as much rn 
+        break
+else: #no sighs? look for type 3s 
+    x = 2
+    #^ my "go away error" methodology
+        #looking for sections within a certain range that last > 0.8 seconds
+        #if there's an apnea, call it, and label it type 3
+
+    
 #Run through apneas
-    #another one within 10 seconds AND no yawn in between?
+    #another one within 10 seconds AND no sigh in between?
         #list durations but combine start time
             #^ ok but that needs to be saved through another method so the highlighting is accurate
 
