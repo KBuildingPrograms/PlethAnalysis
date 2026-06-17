@@ -10,16 +10,20 @@ class Apnea:
         self.duration = start_time - end_time #need to update to fit list type 
         self.start_time = start_time
         self.type = type
-    def print(self):
-        print(f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}")
+    def __str__(self):
+        return f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}"
+    def __repr__(self):
+        return f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}"
     
 class Sigh:
     def __init__(self,start_time,duration):
         self.duration = duration
         self.start_time = start_time
-    def print(self): #defining because it's useful for checking things
-        print(f"Duration: {self.duration}, Start: {self.start_time}")
-   
+    def __str__(self):
+        #defining because it's useful for checking things
+        return f"Duration: {self.duration}, Start: {self.start_time}"
+    def __repr__(self):
+        return f"Duration: {self.duration}, Start: {self.start_time}"
 
 #im probably going to need to narrow these libraries when I get the chance
 #I think apneas can be saved as dicts
