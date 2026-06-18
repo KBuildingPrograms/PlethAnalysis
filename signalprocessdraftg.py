@@ -33,9 +33,9 @@ chunk_value = 20
 sampling_interval = 2000
 Nrows = chunk_value * sampling_interval #total number of rows
 skip_rows = sampling_interval * 3600 #THIS skips the first hour, this has to update in the final version
-print("Paste the file location of the pleth ASCII (no headings, no quotation marks)")
+print("Paste the file location of the pleth ASCII (no headings)")
 pleth_location = input()
-pleth_graph_ascii = pleth_location
+pleth_graph_ascii = pleth_location[1:len(pleth_location)-1]
 #dtype = np.float64
     #this may change based on how time is listed in the excel file
     #actually i can just ignore that column if need be, or use parse date-time
@@ -57,10 +57,6 @@ normalized_ps["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/ple
 
 #take the first half
 pleth_ten_section = normalized_ps.head(len(normalized_ps) // 2).copy() 
-#ok, bandpass filters do NOT work
-smoother = scp.butter(4, 6, fs=2000, output='sos')
-smoothed_signal = scp.sosfilt(smoother, pleth_ten_section['Flow'])
-plt.plot(pleth_ten_section["Time"], smoothed_signal, color='green')
 pleth_ten_section.plot(x="Time",y="Flow")
 #plt.show()
 
@@ -70,7 +66,7 @@ pleth_ten_section.plot(x="Time",y="Flow")
 #Collect the local maximums of a certain height within the first 10 seconds
 pts_peaks_tp = scp.find_peaks(pleth_ten_section["Flow"], height=1.1*pleth_ten_section['Flow'].std())
 pts_peaks_loc = pts_peaks_tp[0]*0.0005 + 3600
-pts_peaks_w =scp.peak_widths(pleth_ten_section["Flow"], pts_peaks_tp[0])
+pts_peaks_w =scp.peak_widths(pleth_ten_section["Flow"], pts_peaks_tp[0],rel_height=0.6)
 pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
 pts_peaks_width = pts_peaks_w[0]*0.0005 
 pts_peaks_start = pts_peaks_w[2]*0.0005 + 3600
@@ -96,7 +92,6 @@ print(ptsp_area_mean)
 
 for index, row in ptsp_dataframe.iterrows(): #going through all the peaks
     if row['Height'] > 1.25*ptsp_mean: #basis definition for a sigh
-        print(row)
         if row['Width'] > 0.7*ptsp_area_mean: #other definition for a sigh
             new_sigh = Sigh(row['Start'],row['Width'])
             print(new_sigh)
@@ -116,6 +111,12 @@ plt.show()
 
 #Got sighs? apnea check
 if len(sighs) >= 1:
+    smoother = scp.butter(3, 6, fs=2000, output='sos') #we are going to use the envelope me thinks
+    smoothed_signal = scp.sosfilt(smoother, pleth_ten_section['Flow'])
+    envelope = scp.hilbert(smoothed_signal)
+    plt.axhspan(-2*pleth_ten_section['Flow'].std(), 0.4*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
+    plt.plot(pleth_ten_section['Time'],smoothed_signal)
+    plt.show()
     for sigh in sighs:
         #something, something, checking for apneas
         #note the sigh then expand 10 seconds out from the sigh
