@@ -1,6 +1,4 @@
 from scipy import signal as scp
-from scipy.integrate import trapezoid
-import scipy.ndimage as scn
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -52,7 +50,6 @@ pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skipr
 #shows the plot of flow
 
 #define the baseline 
-base_flow = -16.4 #probably won't need this after normalization lmao
 #normalize the signal (probably z-score)
 normalized_ps = pleth_section.copy()
 normalized_ps["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
@@ -61,7 +58,7 @@ normalized_ps["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/ple
 #take the first half
 pleth_ten_section = normalized_ps.head(len(normalized_ps) // 2).copy() 
 pleth_ten_section.plot(x="Time",y="Flow")
-#plt.show()
+
 
 #I don't think I need the gradient anymore, but, if it's needed later use np.gradient
 
@@ -73,10 +70,6 @@ pts_peaks_w =scp.peak_widths(pleth_ten_section["Flow"], pts_peaks_tp[0],rel_heig
 pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
 pts_peaks_width = pts_peaks_w[0]*0.0005 
 pts_peaks_start = pts_peaks_w[2]*0.0005 + 3600
-#plt.plot(pts_peaks_loc,pts_peaks_height,"x") #I need a way to specify to calculate the widths of the peaks I already selected
-    #maybe comparing the peaks found by peak_withs and the peaks found by find_peaks and removing all the ones that don't match
-    #I think I need to filter BEFORE sigh check
-    #I KNOW THE OTHER PROBLEM, I LITERALLY FORGOT TO DO LENGTH TIMES WIDTH OH MY GOD
 plt.hlines(pts_peaks_w[1],pts_peaks_start, pts_peaks_width+pts_peaks_start,color="C3")
 
  
@@ -92,7 +85,6 @@ ptsp_dataframe = pd.DataFrame(data=ptsp_data)
 ptsp_dataframe=ptsp_dataframe.sort_values(by='Height',ascending=False)
 ptsp_mean = ptsp_dataframe['Height'].mean()
 ptsp_area_mean = ptsp_dataframe['Width'].mean() * ptsp_dataframe['Height'].mean()
-print(ptsp_area_mean)
 
 for index, row in ptsp_dataframe.iterrows(): #going through all the peaks
     if row['Height'] > 1.25*ptsp_mean: #basis definition for a sigh
@@ -101,9 +93,6 @@ for index, row in ptsp_dataframe.iterrows(): #going through all the peaks
             print(new_sigh)
             sighs.append(new_sigh)
             
-            
-
-#using lpf to see if we can isolate apneas, they tend to be high frequency
 
 
 plt.axhspan(-2*pleth_ten_section['Flow'].std(), 0.3*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
