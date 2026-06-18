@@ -6,8 +6,8 @@ import pandas as pd
 
 
 class Apnea:
-    def __init__(self,type,start_time,end_time):
-        self.duration = start_time - end_time #need to update to fit list type 
+    def __init__(self,type,start_time,duration):
+        self.duration = duration #need to update to fit list type 
         self.start_time = start_time
         self.type = type
     def __str__(self):
@@ -123,19 +123,15 @@ if len(sighs) >= 1:
         extended_peaks_w = scp.peak_widths(extended_view['Flow'], extended_peaks_tp[0],rel_height=0.6)
         extended_peaks_width = extended_peaks_w[0]*0.0005
         extended_peaks_start = extended_peaks_w[2]*0.0005 + extended_view['Time'].iloc[0]
-        
         i=0
         while  i < len(extended_peaks_width)-1: #this...is probably not the right way to write this, but you get the gist 6/18
             if extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]) > 0.8: #eventually want to change 0.8 to 0.7999
-                apnea = Apnea("1/2",extended_peaks_start[i] + extended_peaks_width[i], extended_peaks_start[i+1], extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]))
+                apnea = Apnea("1/2",extended_peaks_start[i] + extended_peaks_width[i], [extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i])])
                 apneas.append(apnea)
             i+=1
-        #something, something, checking for apneas
-        #note the sigh then expand 10 seconds out from the sigh
-        #breaths within a certain std dev after that sigh? that period last at or more than 0.8 seconds? call it type 2
-        #apnea pattern appears not directly after the sigh? call it type 1
-            #differentiating between type 1 & 2 does not matter as much rn 
-        break
+        if len(apneas) < 1:
+            sigh.lack()
+       #Still need to differentiate between type 1 and 2
 else: #no sighs? look for type 3s 
     i = 0
     while i < len(pts_peaks_width)-1:
@@ -148,8 +144,20 @@ else: #no sighs? look for type 3s
 #Run through apneas
 if len(apneas) > 0:
     for apnea in apneas:
-        break #not doing this yet
+        extended_view = normalized_ps.loc[(apnea.start_time < normalized_ps['Time']) & (normalized_ps['Time'] < apnea.start_time + 10), ['Time','Flow']] #extending 10 seconds out from apnea
+        extended_peaks_tp = scp.find_peaks(extended_view["Flow"], height=1.2*extended_view['Flow'].std())
+        extended_peaks_w = scp.peak_widths(extended_view['Flow'], extended_peaks_tp[0],rel_height=0.6)
+        extended_peaks_width = extended_peaks_w[0]*0.0005
+        extended_peaks_start = extended_peaks_w[2]*0.0005 + extended_view['Time'].iloc[0]
+        extended_view.plot(x="Time",y="Flow")
+        plt.hlines(extended_peaks_w[1],extended_peaks_start, extended_peaks_width+extended_peaks_start,color="C2")
+        plt.show()
     #another one within 10 seconds AND no sigh in between?
+        i=0
+        while  i < len(extended_peaks_width)-1: #this...is probably not the right way to write this, but you get the gist 6/18
+            if extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]) > 0.8: #eventually want to change 0.8 to 0.7999
+                apnea.duration.append(extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]))
+            i+=1
         #list durations but combine start time
             #^ ok but that needs to be saved through another method so the highlighting is accurate
 
