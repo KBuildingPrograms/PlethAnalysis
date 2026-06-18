@@ -156,6 +156,7 @@ if len(apneas) > 0:
         i=0
         while  i < len(extended_peaks_width)-1: #this...is probably not the right way to write this, but you get the gist 6/18
             if extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]) > 0.8: #eventually want to change 0.8 to 0.7999
+                #I think I need to add sigh detection in the final, more organized version of everything
                 apnea.duration.append(extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]))
             i+=1
         #list durations but combine start time
