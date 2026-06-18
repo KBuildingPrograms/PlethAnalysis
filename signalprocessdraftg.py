@@ -19,6 +19,9 @@ class Sigh:
     def __init__(self,start_time,duration):
         self.duration = duration
         self.start_time = start_time
+        self.questionable = False
+    def lack(self):
+        self.questionable = True
     def __str__(self):
         #defining because it's useful for checking things
         return f"Duration: {self.duration}, Start: {self.start_time}"
@@ -70,16 +73,17 @@ pts_peaks_w =scp.peak_widths(pleth_ten_section["Flow"], pts_peaks_tp[0],rel_heig
 pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
 pts_peaks_width = pts_peaks_w[0]*0.0005 
 pts_peaks_start = pts_peaks_w[2]*0.0005 + 3600
-plt.plot(pts_peaks_loc,pts_peaks_height,"x") #I need a way to specify to calculate the widths of the peaks I already selected
+#plt.plot(pts_peaks_loc,pts_peaks_height,"x") #I need a way to specify to calculate the widths of the peaks I already selected
     #maybe comparing the peaks found by peak_withs and the peaks found by find_peaks and removing all the ones that don't match
     #I think I need to filter BEFORE sigh check
     #I KNOW THE OTHER PROBLEM, I LITERALLY FORGOT TO DO LENGTH TIMES WIDTH OH MY GOD
-
+plt.hlines(pts_peaks_w[1],pts_peaks_start, pts_peaks_width+pts_peaks_start,color="C3")
 
  
 
 #Sigh check:
 sighs = []
+apneas = []
 new_sigh = None
 ptsp_data = {'Time': pts_peaks_loc, 'Height': pts_peaks_height, 'Width': pts_peaks_width, 'Start': pts_peaks_start}
 ptsp_dataframe = pd.DataFrame(data=ptsp_data)
@@ -107,17 +111,25 @@ try:
     plt.axvspan(getattr(new_sigh, "start_time"), getattr(new_sigh, "start_time") + getattr(new_sigh, "duration"), color='blue', alpha=0.3 )
 except:
     pass
-plt.show()
+#plt.show()
 
 #Got sighs? apnea check
 if len(sighs) >= 1:
-    smoother = scp.butter(3, 6, fs=2000, output='sos') #we are going to use the envelope me thinks
-    smoothed_signal = scp.sosfilt(smoother, pleth_ten_section['Flow'])
-    envelope = scp.hilbert(smoothed_signal)
     plt.axhspan(-2*pleth_ten_section['Flow'].std(), 0.4*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
-    plt.plot(pleth_ten_section['Time'],smoothed_signal)
     plt.show()
     for sigh in sighs:
+        extended_view = normalized_ps.loc[(sigh.start_time < normalized_ps['Time']) & (normalized_ps['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
+        extended_peaks_tp = scp.find_peaks(extended_view["Flow"], height=1.2*extended_view['Flow'].std())
+        extended_peaks_w = scp.peak_widths(extended_view['Flow'], extended_peaks_tp[0],rel_height=0.6)
+        extended_peaks_width = extended_peaks_w[0]*0.0005
+        extended_peaks_start = extended_peaks_w[2]*0.0005 + extended_view['Time'].iloc[0]
+        
+        i=0
+        while  i < len(extended_peaks_width)-1: #this...is probably not the right way to write this, but you get the gist 6/18
+            if extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]) > 0.8: #eventually want to change 0.8 to 0.7999
+                apnea = Apnea("1/2",extended_peaks_start[i] + extended_peaks_width[i], extended_peaks_start[i+1], extended_peaks_start[i+1] - (extended_peaks_start[i] + extended_peaks_width[i]))
+                apneas.append(apnea)
+            i+=1
         #something, something, checking for apneas
         #note the sigh then expand 10 seconds out from the sigh
         #breaths within a certain std dev after that sigh? that period last at or more than 0.8 seconds? call it type 2
@@ -125,13 +137,18 @@ if len(sighs) >= 1:
             #differentiating between type 1 & 2 does not matter as much rn 
         break
 else: #no sighs? look for type 3s 
-    x = 2
-    #^ my "go away error" methodology
-        #looking for sections within a certain range that last > 0.8 seconds
-        #if there's an apnea, call it, and label it type 3
+    i = 0
+    while i < len(pts_peaks_width)-1:
+        if pts_peaks_start[i+1] - (pts_peaks_start[i] + pts_peaks_width[i]) > 0.8:
+            apnea = Apnea("3", pts_peaks_start[i]+pts_peaks_width[i], pts_peaks_start[i+1], pts_peaks_start[i+1] - (pts_peaks_start[i] + pts_peaks_width[i]))
+    i+=1
+
 
     
 #Run through apneas
+if len(apneas) > 0:
+    for apnea in apneas:
+        break #not doing this yet
     #another one within 10 seconds AND no sigh in between?
         #list durations but combine start time
             #^ ok but that needs to be saved through another method so the highlighting is accurate
