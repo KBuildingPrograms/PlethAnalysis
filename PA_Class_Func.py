@@ -1,43 +1,44 @@
 from scipy import signal as scp
-import matplotlib.pyplot as plt
 import pandas as pd
 
 class Apnea:
     def __init__(self,type,start_time,duration):
-        self.duration = duration #need to update to fit list type 
-        self.start_time = start_time
-        self.type = type
-    def __str__(self):
+        self.duration = duration #list of durations for the apneas
+        self.start_time = start_time #the start of the first major apnea
+        self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
+    def __str__(self): #information for use via print function
         return f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}"
     def __repr__(self):
         return f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}"
     
 class Sigh:
     def __init__(self,start_time,duration):
-        self.duration = duration
-        self.start_time = start_time
-        self.questionable = False
+        self.duration = duration #duration of sigh based on width
+        self.start_time = start_time #start of the sigh
+        self.questionable = False #whether the sigh could or couldnot potentially be a sniff
     def lack(self):
-        self.questionable = True
+        self.questionable = True #set when there's no apneas after and it may be just a sniff
     def __str__(self):
-        #defining because it's useful for checking things
+        #defining for print because it's useful for checking things
         return f"Duration: {self.duration}, Start: {self.start_time}"
     def __repr__(self):
         return f"Duration: {self.duration}, Start: {self.start_time}"
 
-def skiprows():
-    pass #getting prepared to make skipped rows updateable
+def skiprows(iteration):
+    skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
+    return skiprows
 
 def signal_prep(signal_name,skiprows):
-    chunk_value = 20
-    sampling_interval = 2000
+    chunk_value = 20 #block of time to take
+    sampling_interval = 2000 #sampling freq
     Nrows = chunk_value * sampling_interval #total number of rows
     if type(signal_name) is not str:
         raise TypeError("Signal name must be string") #guard against weird pass
     signal_name = signal_name.replace("\"","") #removes the windows quotations from copying 
-    pleth_graph_ascii = signal_name 
+    signal_name = signal_name.replace("\n","")
+    pleth_graph_ascii = signal_name #takes the ascii input data
     pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, low_memory=False, header=0, names=["Time","Flow"])
-
+        #^ converts ascii data to pd.dataframe
     normalized_signal = pleth_section.copy()
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
