@@ -107,7 +107,7 @@ if len(sighs) >= 1:
     plt.axhspan(-2*pleth_ten_section['Flow'].std(), 0.4*pleth_ten_section['Flow'].std(), color='lightgreen', alpha=0.3)
     plt.show()
     for sigh in sighs:
-        extended_view = normalized_ps.loc[(sigh.start_time < normalized_ps['Time']) & (normalized_ps['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
+        extended_view = normalized_ps.loc[(sigh.start_time > normalized_ps['Time']) & (normalized_ps['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
         extended_peaks_tp = scp.find_peaks(extended_view["Flow"], height=1.2*extended_view['Flow'].std())
         extended_peaks_w = scp.peak_widths(extended_view['Flow'], extended_peaks_tp[0],rel_height=0.6)
         extended_peaks_width = extended_peaks_w[0]*0.0005
