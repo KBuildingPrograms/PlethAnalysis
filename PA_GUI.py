@@ -45,6 +45,8 @@ class PA_IntroWindow:
 
             file_acq = Label(self.window,text='File Acquired!',font=('calibre',15,'bold'))
             file_acq.grid(row=3,column=0)
+
+            Analysis_Window(self.window,self.signal,self.sub_signal)
         except Exception as e:
             print("Invalid Filename")
             error_note = Label(self.window,text=e,font=('calibre',15,'bold'))
@@ -52,9 +54,8 @@ class PA_IntroWindow:
 
 
 class Analysis_Window:
-    def __init__(self, frame, dataframe, sub_dataframe):
-        self.window = frame
-        self.window.attributes('-fullscreen', True)
+    def __init__(self,window,dataframe, sub_dataframe):
+        self.new_window(window)
         self.width = self.window.winfo_width()
         self.height = self.window.winfo_height()
         self.iter = iter
@@ -64,9 +65,13 @@ class Analysis_Window:
         self.main_data = dataframe
         self.subsection_data = sub_dataframe
 
-        self.event_frame = Tk,Frame(self.windwo, width=int(self.width/2), height=int(self.height/2))
+        self.event_frame = Tk.Frame(self.windwo, width=int(self.width/2), height=int(self.height/2))
         self.display_data()
         self.analyze_data()
+    def new_window(self,window):
+        self.window = Toplevel(master=window)
+        self.window.title = ("AnalysisWindow")
+        self.window.attributes('-fullscreen',True)
     def display_data(self):
         self.table = Table(self.frame_table, dataframe=self.subsection_data, showtoolbar=True, showstatusbar=True)
         self.frame_table.place(relx=0.0,rely=0.0,anchor="nw")
@@ -106,9 +111,8 @@ class Analysis_Window:
         
 
 window = Tk()
-if __name__ == "__main__":
-    IntroWindow = PA_IntroWindow(window,'zoomed')
-    window.mainloop()
+IntroWindow = PA_IntroWindow(window,'zoomed')
+window.mainloop()
 
 
 
