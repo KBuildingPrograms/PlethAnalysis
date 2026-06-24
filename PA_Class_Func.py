@@ -3,6 +3,7 @@ import pandas as pd
 
 class Apnea:
     def __init__(self,type,start_time,duration):
+        self.name = "Apnea"
         self.duration = duration #list of durations for the apneas
         self.start_time = start_time #the start of the first major apnea
         self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
@@ -13,6 +14,7 @@ class Apnea:
     
 class Sigh:
     def __init__(self,start_time,duration):
+        self.name = "Sigh"
         self.duration = duration #duration of sigh based on width
         self.start_time = start_time #start of the sigh
         self.questionable = False #whether the sigh could or couldnot potentially be a sniff
@@ -111,7 +113,8 @@ def type3_apnea(peak_data, apneas):
         if peak_data["Start"].iloc[i+1] - (peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i]) > 0.7999 & (not matching_apnea(peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i],apneas)): 
              apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], [peak_data["Start"].iloc[i+1], peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i])])
              apneas.append(apnea)
-    i+=1
+        i+=1
+    return apneas
 
 def apnea_combination(normalized_signal, apneas): #no idea if I wrote this correctly yet
     for apnea in apneas:
