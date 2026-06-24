@@ -74,7 +74,7 @@ def find_sighs(peak_dataframe,peak_height_mean,peak_area_mean): #i could add the
         if row['Height'] > 1.25*peak_height_mean: #basis definition for a sigh
             if row['Width'] > 0.7*peak_area_mean: #other definition for a sigh
                 new_sigh = Sigh(row['Start'],row['Width'])
-                sighs.append[new_sigh]
+                sighs.append(new_sigh)
     return sighs
 
 def postsigh_apnea(normalized_signal, sigh):
@@ -85,21 +85,21 @@ def postsigh_apnea(normalized_signal, sigh):
     i=0
     apneas = []
     if next_sigh[0] is not None:
-        extended_peaks = extended_peaks.loc[next_sigh[0].start_time > extended_view['Time']]
-        while i < len(extended_peaks) - 1:
-            if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
-                apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i],[extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i])])
+        extended_peak_view = extended_peaks.loc[next_sigh[0].start_time > extended_view['Time']] 
+        while i < len(extended_peak_view) - 1:
+            if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999:
+                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i],[extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i])])
                 apneas.append(apnea)
             i+=1
     else:
-        while i < len(extended_view)-1:
+        while i < len(extended_view) - 1:
             if extended_view["Start"].iloc[i+1] - (extended_view["Start"].iloc[i]+extended_view["Width"].iloc[i]) > 0.7999:
                 apnea = Apnea("1/2", extended_view["Start"].iloc[i] + extended_view["Width"].iloc[i],[extended_view["Start"].iloc[i+1] - (extended_view["Start"].iloc[i] + extended_view["Width"].iloc[i])])
                 apneas.append(apnea)
             i+=1
     if len(apneas) < 1:
         sigh.lack()
-    return apneas, sigh
+    return apneas
 
 def matching_apnea(start_time,apneas):
     return any(
@@ -109,7 +109,7 @@ def matching_apnea(start_time,apneas):
 
 def type3_apnea(peak_data, apneas):
     i = 0
-    while i < len(peak_data)-1:
+    while i < len(peak_data) - 1:
         if peak_data["Start"].iloc[i+1] - (peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i]) > 0.7999 & (not matching_apnea(peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i],apneas)): 
              apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], [peak_data["Start"].iloc[i+1], peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i])])
              apneas.append(apnea)

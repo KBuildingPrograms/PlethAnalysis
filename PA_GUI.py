@@ -4,6 +4,8 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 from pandastable import Table, TableModel
 import pandas as pd
 import PA_Class_Func as pa
+import sys
+import traceback
 
 def plot():
     pass
@@ -15,7 +17,7 @@ def plot():
     # toolbar.update()
     # canvas.get_tk_widget().pack()
 iter = 0
-
+window = Tk()
 
 class PA_IntroWindow:
     def __init__(self,frame,state):
@@ -32,10 +34,7 @@ class PA_IntroWindow:
         self.submit = Button(self.window, text="Submit", command=self.file_name)
         self.submit.grid(row=2,column=1)
     def summon_window(self):
-        try:
-            new = Analysis_Window(self.window,self.signal,self.sub_signal)
-        except Exception as e:
-            print(e)
+        new = Analysis_Window(self.signal,self.sub_signal)
     def file_name(self):
         e = ""
         try:
@@ -52,21 +51,22 @@ class PA_IntroWindow:
             
             self.summon_window()
         except Exception as e:
-            print("Invalid Filename")
-            print(e)
+            _, _, exc_tb = sys.exc_info()
+            tb_details = traceback.extract_tb(exc_tb)
+            filename, line_number, func_name, text = tb_details[-1]
+            print(f"The error is: {text}")
             error_note = Label(self.window,text=e,font=('calibre',15,'bold'))
             error_note.grid(row=3,column=0)
 
 
 
 class Analysis_Window:
-    def __init__(self,window,dataframe, sub_dataframe):
+    def __init__(self, dataframe,sub_dataframe):
         self.new_window(window)
         self.width = self.window.winfo_width()
         self.height = self.window.winfo_height()
         self.iter = iter
 
-        self.window.title("Analysis")
         self.frame_table = Frame(self.window, width=int(self.width/2), height=self.height)
         self.main_data = dataframe
         self.subsection_data = sub_dataframe
@@ -75,22 +75,22 @@ class Analysis_Window:
         self.display_data()
         self.analyze_data()
         self.display_events()
-    def new_window(self,window):
-        self.window = Toplevel(master=window)
-        self.window.title = ("AnalysisWindow")
-        self.window.attributes = ('-fullscreen',True)
+    def new_window(self,frame):
+        self.window = Toplevel(master=frame)
+        self.window.title("AnalysisWindow")
     def display_data(self):
-        print("Here!")
         self.table = Table(self.frame_table, dataframe=self.subsection_data, showtoolbar=True, showstatusbar=True)
         self.frame_table.place(relx=0.0,rely=0.0,anchor="nw")
         self.table.show()
     def analyze_data(self):
-        self.peaks = pa.peak_analysis(self.sub_dataframe,self.iter)
+        self.peaks = pa.peak_analysis(self.subsection_data,self.iter)
         self.peaks_mean, self.peaks_area_mean = pa.peak_means(self.peaks)
         self.sighs = pa.find_sighs(self.peaks,self.peaks_mean,self.peaks_area_mean)
-        self.apneas = pa.postsigh_apnea(self.main_data,self.sighs)
-        self.apneas = pa.type3_apnea(self.peaks,self.apneas)
-        self.apneas = pa.apnea_combination(self.main_data,self.apneas)
+        self.apneas = []
+        for sigh in self.sighs:
+            self.apneas += pa.postsigh_apnea(self.main_data,sigh) 
+        self.apneas += pa.type3_apnea(self.peaks,self.apneas)
+        self.apneas += pa.apnea_combination(self.main_data,self.apneas)
     def concatonate_data(self):
         names = []
         starts = []
@@ -118,7 +118,7 @@ class Analysis_Window:
 
         
 
-window = Tk()
+
 IntroWindow = PA_IntroWindow(window,'zoomed')
 window.mainloop()
 
