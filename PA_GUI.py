@@ -31,7 +31,11 @@ class PA_IntroWindow:
         self.file_entry.grid(row=0,column=1)
         self.submit = Button(self.window, text="Submit", command=self.file_name)
         self.submit.grid(row=2,column=1)
-
+    def summon_window(self):
+        try:
+            new = Analysis_Window(self.window,self.signal,self.sub_signal)
+        except Exception as e:
+            print(e)
     def file_name(self):
         e = ""
         try:
@@ -45,12 +49,14 @@ class PA_IntroWindow:
 
             file_acq = Label(self.window,text='File Acquired!',font=('calibre',15,'bold'))
             file_acq.grid(row=3,column=0)
-
-            Analysis_Window(self.window,self.signal,self.sub_signal)
+            
+            self.summon_window()
         except Exception as e:
             print("Invalid Filename")
+            print(e)
             error_note = Label(self.window,text=e,font=('calibre',15,'bold'))
             error_note.grid(row=3,column=0)
+
 
 
 class Analysis_Window:
@@ -61,18 +67,20 @@ class Analysis_Window:
         self.iter = iter
 
         self.window.title("Analysis")
-        self.frame_table = Tk.Frame(self.window, width=int(self.width/2), height=self.height)
+        self.frame_table = Frame(self.window, width=int(self.width/2), height=self.height)
         self.main_data = dataframe
         self.subsection_data = sub_dataframe
 
-        self.event_frame = Tk.Frame(self.windwo, width=int(self.width/2), height=int(self.height/2))
+        self.event_frame = Frame(self.window, width=int(self.width/2), height=int(self.height/2))
         self.display_data()
         self.analyze_data()
+        self.display_events()
     def new_window(self,window):
         self.window = Toplevel(master=window)
         self.window.title = ("AnalysisWindow")
-        self.window.attributes('-fullscreen',True)
+        self.window.attributes = ('-fullscreen',True)
     def display_data(self):
+        print("Here!")
         self.table = Table(self.frame_table, dataframe=self.subsection_data, showtoolbar=True, showstatusbar=True)
         self.frame_table.place(relx=0.0,rely=0.0,anchor="nw")
         self.table.show()
