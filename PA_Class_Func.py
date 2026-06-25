@@ -79,7 +79,7 @@ def find_sighs(peak_dataframe,peak_height_mean,peak_area_mean): #i could add the
 
 def postsigh_apnea(normalized_signal, sigh):
     #iterating through sighs
-    extended_view = normalized_signal.loc[(sigh.start_time > normalized_signal['Time']) & (normalized_signal['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
+    extended_view = normalized_signal.loc[(sigh.start_time < normalized_signal['Time']) & (normalized_signal['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
     extended_peaks = peak_analysis(extended_view, extended_view['Time'].iloc[0])
     next_sigh = find_sighs(extended_peaks,peak_means(extended_view))
     i=0
@@ -92,9 +92,9 @@ def postsigh_apnea(normalized_signal, sigh):
                 apneas.append(apnea)
             i+=1
     else:
-        while i < len(extended_view) - 1:
-            if extended_view["Start"].iloc[i+1] - (extended_view["Start"].iloc[i]+extended_view["Width"].iloc[i]) > 0.7999:
-                apnea = Apnea("1/2", extended_view["Start"].iloc[i] + extended_view["Width"].iloc[i],[extended_view["Start"].iloc[i+1] - (extended_view["Start"].iloc[i] + extended_view["Width"].iloc[i])])
+        while i < len(extended_peak_view) - 1:
+            if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999:
+                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i],[extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i])])
                 apneas.append(apnea)
             i+=1
     if len(apneas) < 1:
@@ -117,14 +117,17 @@ def type3_apnea(peak_data, apneas):
     return apneas
 
 def apnea_combination(normalized_signal, apneas): #no idea if I wrote this correctly yet
+    removed_apneas = []
     for apnea in apneas:
         extended_view = peak_analysis(normalized_signal, apnea.start_time)
         sigh_caught = find_sighs(extended_view,peak_means(extended_view))
        
         if len(sigh_caught) > 0:
-            apnea.duration.append(apnea2.duration[0] for apnea2 in apneas if apnea.start_time < apnea2.duration[0] < sigh_caught[0].start_time)
-            apneas.remove(apnea2 for apnea2 in apneas if apnea.start_time < apnea2.duration[0] < sigh_caught[0].start_time)
+            apnea.duration.append(apnea2.duration[0] for apnea2 in apneas if apnea.start_time < apnea2.start_time < sigh_caught[0].start_time)
+            removed_apneas.append(apnea2 for apnea2 in apneas if apnea.start_time < apnea2.start_time < sigh_caught[0].start_time )
         else:
-            apnea.duration.append(apnea2.duration[0] for apnea2 in apneas if apnea.start_time < apnea2.duration[0] < extended_view["Time"].iloc(0))
-            apneas.remove(apnea2 for apnea2 in apneas if apnea.start_time < apnea2.duration[0] < extended_view["Time"].iloc[0])
+            apnea.duration.append(apnea2.duration[0] for apnea2 in apneas if apnea.start_time < apnea2.duration[0] < extended_view["Time"].iloc[0])
+            removed_apneas.append(apnea2 for apnea2 in apneas if apnea.start_time < apnea2.start_time < extended_view["Time"].iloc[0])
+
+    apneas = apneas - removed_apneas
     return apneas
