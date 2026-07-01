@@ -6,6 +6,7 @@ class Apnea:
         self.name = "Apnea"
         self.duration = duration #list of durations for the apneas
         self.start_time = start_time #the start of the first major apnea
+        self.width = start_time + duration[0]
         self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
     def __str__(self): #information for use via print function
         return f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}"
@@ -17,6 +18,7 @@ class Sigh:
         self.name = "Sigh"
         self.duration = duration #duration of sigh based on width
         self.start_time = start_time #start of the sigh
+        self.width = start_time + duration
         self.questionable = False #whether the sigh could or couldnot potentially be a sniff
     def lack(self):
         self.questionable = True #set when there's no apneas after and it may be just a sniff
@@ -116,7 +118,7 @@ def type3_apnea(peak_data, apneas):
     while i < len(peak_data) - 2:
         if peak_data["Start"].iloc[i+1] - (peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i]) > 0.7999 and (not matching_apnea(peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i],apneas)): 
              #if there's a gap in the peaks big enough for an apnea AND it's not an apnea already saved, it's a type 3
-             apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], [peak_data["Start"].iloc[i+1], peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i])])
+             apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], [peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i])])
              apneas.append(apnea)
         i+=1
     return apneas
