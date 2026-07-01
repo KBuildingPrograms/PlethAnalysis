@@ -122,15 +122,19 @@ class Analysis_Window:
         self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
         self.event_table.show()
     def summon_graph(self):
-        fig = Figure(figsize=(5,4), dpi=100)
-        self.subsection_data.plot(x='Time',y='Flow')
-        canvas = FigureCanvasTkAgg(fig, master=window)
+        fig = Figure(figsize=(6.5,4), dpi=120)
+        axes = fig.add_subplot()
+        self.subsection_data.plot(x='Time',y='Flow',ax=axes)
+        canvas = FigureCanvasTkAgg(fig, master=self.window)
         canvas.draw()
         for sigh in self.sighs:
-            fig.axes[0].axvspan(sigh.start_time, sigh.start_time + sigh.duration)
+            axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
         for apnea in self.apneas:
-            fig.axes[0].axvspan(apnea.start_time, apnea.start_time + apnea.duration[0])
-        canvas.get_tk_widget.pack()
+            axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
+        toolbar = NavigationToolbar2Tk(canvas, self.window)
+        toolbar.update()
+        toolbar.place(relx=0.0,rely=1.0,anchor='e')
+        canvas.get_tk_widget().place(relx=1.0,rely=0.0,anchor="ne")
     def next_loop(self):
         update()
         self.display_data() #displays the main data
