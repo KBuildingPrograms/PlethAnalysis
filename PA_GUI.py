@@ -9,7 +9,7 @@ import sys
 import traceback
     
 iter = 0
-window = Tk()
+
 def update():
     iter += 1
 
@@ -35,7 +35,10 @@ class PA_IntroWindow: #first window for taking the ascii file name
         self.submit = Button(self.window, text="Submit", command=self.file_name) #submits the contents of the textbox to a section that may activate the next window
         self.submit.grid(row=2,column=1)
     def summon_window(self): #summons the next window
-        new = Analysis_Window(self.signal,self.sub_signal) #initiates the next window
+        try:
+            new = Analysis_Window(self.signal,self.sub_signal) #initiates the next window
+        except Exception as e:
+            print(e)
     def file_name(self):
         e = "" #to update error message
         try:
@@ -144,7 +147,7 @@ class Analysis_Window:
 
 
         
-
+window = Tk()
 IntroWindow = PA_IntroWindow(window,'zoomed')
 window.mainloop()
 
