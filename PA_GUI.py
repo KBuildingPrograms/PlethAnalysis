@@ -16,24 +16,30 @@ def update():
 class PA_IntroWindow: #first window for taking the ascii file name
     def __init__(self,frame,state):
         self.window = frame #takes the universal Tk
-        self.window.title("FirstStep") #names it after the section
+        self.window.title("File Input") #names it after the section
         self.state = state #takes the condition that defines the window shape
         self.iter = iter #takes the current iteration based on the global
 
+        message = "Welcome to the Plethysmography Analysis Alpha Build. To begin take the ascii data of the plethysmography you want to analyze, remove the headers via notepad, and paste the file path below. Or, if you have a savefile with the place" \
+        " you have so far, paste the file location of the savefile."
+        t = Text(self.window, width=30, height=10, wrap='word',font=('calibre',12,'normal'))
+        t.insert('1.0',message)
+        t.grid(row=0,column=0)
+
         self.file_var = StringVar() #file name tkinter string
         self.file_label = Label(self.window,text="Paste Filename Here:",font=('calibre',15,'bold')) #prompts the user for the filename
-        self.file_label.grid(row=0,column=0)
+        self.file_label.grid(row=1,column=0)
         self.file_entry = Entry(self.window, textvariable=self.file_var,font=('calibre',15,'normal')) #allows the user to enter the filename
-        self.file_entry.grid(row=0,column=1)
+        self.file_entry.grid(row=1,column=1)
 
         self.savefile_var = StringVar()
         self.savefile_label = Label(self.window,text="Paste Savefile Name Here:",font=('calibre',15,'bold'))
-        self.savefile_label.grid(row=1,column=0)
+        self.savefile_label.grid(row=2,column=0)
         self.savefile_entry = Entry(self.window, textvariable=self.savefile_var,font=('calibre',15,'normal'))
-        self.savefile_entry.grid(row=1,column=1)
+        self.savefile_entry.grid(row=2,column=1)
 
         self.submit = Button(self.window, text="Submit", command=self.file_name) #submits the contents of the textbox to a section that may activate the next window
-        self.submit.grid(row=2,column=1)
+        self.submit.grid(row=3,column=1)
     def summon_window(self): #summons the next window
         try:
             new = Analysis_Window(self.signal,self.sub_signal) #initiates the next window
