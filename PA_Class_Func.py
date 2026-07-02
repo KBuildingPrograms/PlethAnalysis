@@ -8,10 +8,18 @@ class Apnea:
         self.start_time = start_time #the start of the first major apnea
         self.width = start_time + duration[0]
         self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
+        self.sub_apneas = []
+    def add_subapnea(self,apnea):
+        self.sub_apneas.append(apnea)
+        self.duration.append(apnea.duration[0])
     def __str__(self): #information for use via print function
-        return f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}"
+        return f"Type: {self.type}, Start: {self.start_time}, Duration: {self.duration}"
     def __repr__(self):
-        return f"Duration: {self.duration}, Start: {self.start_time}, Type: {self.type}"
+        return f"Type: {self.type}, Start: {self.start_time}, Duration: {self.duration}"
+    def __gt__(self, apnea2):
+        return self.start_time > apnea2.start_time or apnea2 in self.sub_apneas
+    def __eq__(self,apnea2):
+        return self.start_time == apnea2.start_time
     
 class Sigh:
     def __init__(self,start_time,duration):
@@ -24,9 +32,9 @@ class Sigh:
         self.questionable = True #set when there's no apneas after and it may be just a sniff
     def __str__(self):
         #defining for print because it's useful for checking things
-        return f"Duration: {self.duration}, Start: {self.start_time}"
+        return f"Start: {self.start_time}, Duration: {self.duration}"
     def __repr__(self):
-        return f"Duration: {self.duration}, Start: {self.start_time}"
+        return f"Start: {self.start_time}, Duration: {self.duration}"
 
 def skiprows(iteration):
     skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
@@ -72,9 +80,8 @@ def peak_means(peak_data):
 
 def find_sighs(peak_dataframe,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
     sighs = []
-    for index, row in peak_dataframe.iterrows(): #going through all the peaks
-        if row['Height'] > 1.25*peak_height_mean: #basis definition for a sigh
-            if row['Width'] > 0.7*peak_area_mean: #other definition for a sigh
+    for _, row in peak_dataframe.iterrows(): #going through all the peaks
+        if row['Height'] > 1.25*peak_height_mean and row['Width'] > 0.7*peak_area_mean: #definitions for a sigh
                 new_sigh = Sigh(row['Start'],row['Width'])
                 sighs.append(new_sigh)
     return sighs
@@ -107,10 +114,10 @@ def postsigh_apnea(normalized_signal, sigh):
         sigh.lack() #if there are no apneas after the sigh, the sigh may be a sniff, and needs to be highlighted differently
     return apneas
 
-def matching_apnea(start_time,apneas):
+def matching_apnea(apnea,apneas):
     return any(
-        apnea.start_time == start_time #if there's another apnea that has the same start time as the input, return True
-        for apnea in apneas
+        apnea >= apnea2 #if there's another apnea that has the same start time as the input, return True
+        for apnea2 in apneas
     )
 
 def type3_apnea(peak_data, apneas):
@@ -123,7 +130,7 @@ def type3_apnea(peak_data, apneas):
         i+=1
     return apneas
 
-def apnea_combination(normalized_signal, apneas): #no idea if I wrote this correctly yet
+def apnea_combination(normalized_signal, apneas): #I need a way to clean this, good god
     removed_apneas = []
     for apnea in apneas:
         extended_view = peak_analysis(normalized_signal, apnea.start_time)
@@ -131,11 +138,15 @@ def apnea_combination(normalized_signal, apneas): #no idea if I wrote this corre
         sigh_caught = find_sighs(extended_view,ev_hmean,ev_amean)
        
         if len(sigh_caught) > 0:
-            apnea.duration.append(apnea2.duration[0] for apnea2 in apneas if apnea.start_time < apnea2.start_time < sigh_caught[0].start_time)
-            removed_apneas.append(apnea2 for apnea2 in apneas if apnea.start_time < apnea2.start_time < sigh_caught[0].start_time )
+            for apnea2 in apneas: 
+                if apnea.start_time < apnea2.start_time < sigh_caught[0].start_time:
+                    apnea.add_subapnea(apnea2)
+                    removed_apneas.append(apnea2)
         else:
-            apnea.duration.append(apnea2.duration[0] for apnea2 in apneas if apnea.start_time < apnea2.duration[0] < extended_view["Time"].iloc[0])
-            removed_apneas.append(apnea2 for apnea2 in apneas if apnea.start_time < apnea2.start_time < extended_view["Time"].iloc[0])
+            for apnea2 in apneas: 
+                if apnea.start_time < apnea2.duration[0] < extended_view["Time"].iloc[0]:
+                    apnea.add_subapnea(apnea2)
+                    removed_apneas.append(apnea2)
 
     apneas = [apnea for apnea in apneas if apnea not in removed_apneas]
     return apneas
