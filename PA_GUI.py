@@ -1,5 +1,4 @@
 from tkinter import *
-import matplotlib as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from pandastable import Table, TableModel
@@ -49,7 +48,7 @@ class PA_IntroWindow: #first window for taking the ascii file name
         e = "" #to update error message
         try:
             skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
-            signal, sub_signal = pa.signal_prep(self.file_var.get(),skiprows) #acquire the 20 second and 10 second interval
+            _, _ = pa.signal_prep(self.file_var.get(),skiprows) #acquire the 20 second and 10 second interval
          
             error_note = Label(self.window,text=e,font=('calibre',15,'bold')) #removes the error note if there was a previous error
             error_note.grid(row=3,column=0)
@@ -61,7 +60,7 @@ class PA_IntroWindow: #first window for taking the ascii file name
         except Exception as e:
             _, _, exc_tb = sys.exc_info()
             tb_details = traceback.extract_tb(exc_tb)
-            filename, line_number, func_name, text = tb_details[-1]
+            _, _, _, text = tb_details[-1]
             print(f"The error is: {text}") #to let me know what the error is while debugging
             error_note = Label(self.window,text=e,font=('calibre',15,'bold')) #informs the user what type of error ocurred while trying to load the file
             error_note.grid(row=3,column=0)
@@ -101,8 +100,8 @@ class Analysis_Window:
         self.window.title("AnalysisWindow")
         self.window.state('zoomed')
     def acquire_data(self):
-        skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
-        self.main_data, self.subsection_data = pa.signal_prep(self.file_var.get(),skiprows) #acquire the 20 second and 10 second interval
+        self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
+        self.main_data, self.subsection_data = pa.signal_prep(self.file_var.get(),self.skiprows) #acquire the 20 second and 10 second interval
     def display_data(self):
         self.table = Table(self.frame_table, dataframe=self.subsection_data, showtoolbar=False, showstatusbar=True)
         self.frame_table.place(relx=0.0,rely=0.0,anchor="nw")
@@ -112,11 +111,10 @@ class Analysis_Window:
         self.peaks = pa.peak_analysis(self.subsection_data,(self.skiprows*(1/2000)))
         self.peaks_mean, self.peaks_area_mean = pa.peak_means(self.peaks)
         self.sighs = pa.find_sighs(self.peaks,self.peaks_mean,self.peaks_area_mean)
-        for sigh in self.sighs:
-            self.apneas += pa.postsigh_apnea(self.main_data,sigh)
+        for sigh in self.sighs or []:
+                self.apneas = pa.postsigh_apnea(self.main_data,sigh)
         self.apneas = pa.type3_apnea(self.peaks, self.apneas)
         self.apneas = pa.apnea_combination(self.main_data,self.apneas)
-        print(self.apneas)
     def concatonate_data(self):
         for sigh in self.sighs:
             self.names.append(sigh.name)

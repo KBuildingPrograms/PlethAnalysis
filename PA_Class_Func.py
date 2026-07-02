@@ -95,7 +95,7 @@ def postsigh_apnea(normalized_signal, sigh):
     i=0 #indexing value for while loops
     apneas = [] #to acquire apneas
     if len(next_sigh) > 0: #if there is a sigh
-        extended_peak_view = extended_peaks.loc[next_sigh[0].start_time > extended_view['Time']] #condense the extended peak view to end before the next sigh
+        extended_peak_view = extended_peaks.loc[next_sigh[0].start_time > extended_peaks['Time']] #condense the extended peak view to end before the next sigh
         while i < len(extended_peak_view) - 2: #While the index is less than the maximum
             if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999:
                 #if the distance between the start of the next peak and the end of the first peak is greater than 0.7999, that means there's an apnea
