@@ -147,7 +147,7 @@ class Analysis_Window:
             axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
         toolbar = NavigationToolbar2Tk(canvas, self.window)
         toolbar.update()
-        toolbar.place(relx=1.0,rely=1.0,anchor='e')
+        toolbar.place(relx=1.0,rely=0.5,anchor='e')
         canvas.get_tk_widget().place(relx=1.0,rely=0.0,anchor="ne")
     def next_loop(self):
         update()
