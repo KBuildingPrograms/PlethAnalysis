@@ -70,6 +70,7 @@ def peak_analysis(normalized_signal,skiprows):
 
     ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
     ptsp_dataframe = pd.DataFrame(data=ptsp_data)
+    ptsp_dataframe = ptsp_dataframe.sort_values(by='Height',ascending=False)
     return ptsp_dataframe
 
 def peak_means(peak_data):
@@ -80,7 +81,7 @@ def peak_means(peak_data):
 
 def find_sighs(peak_dataframe,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
     sighs = []
-    for _, row in peak_dataframe.iterrows(): #going through all the peaks
+    for _, row in peak_dataframe.iterrows(index=0): #picking the largest peak
         if row['Height'] > 1.25*peak_height_mean and row['Width'] > 0.7*peak_area_mean: #definitions for a sigh
                 new_sigh = Sigh(row['Start'],row['Width'])
                 sighs.append(new_sigh)

@@ -33,7 +33,7 @@ class Sigh:
 chunk_value = 20
 sampling_interval = 2000
 Nrows = chunk_value * sampling_interval #total number of rows
-skip_rows = sampling_interval * 3600 #THIS skips the first hour, this has to update in the final version
+skip_rows = sampling_interval * (3600 + 30) #THIS skips the first hour, this has to update in the final version
 print("Paste the file location of the pleth ASCII (no headings)")
 pleth_location = input()
 pleth_graph_ascii = pleth_location[1:len(pleth_location)-1]
@@ -65,13 +65,13 @@ pleth_ten_section.plot(x="Time",y="Flow")
 
 #Collect the local maximums of a certain height within the first 10 seconds
 pts_peaks_tp = scp.find_peaks(pleth_ten_section["Flow"], height=1.1*pleth_ten_section['Flow'].std())
-pts_peaks_loc = pts_peaks_tp[0]*0.0005 + 3600
+pts_peaks_loc = pts_peaks_tp[0]*0.0005 + skip_rows/2000
 pts_peaks_w =scp.peak_widths(pleth_ten_section["Flow"], pts_peaks_tp[0],rel_height=0.6)
 pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
 pts_peaks_width = pts_peaks_w[0]*0.0005 
-pts_peaks_start = pts_peaks_w[2]*0.0005 + 3600
+pts_peaks_start = pts_peaks_w[2]*0.0005 + skip_rows/2000
 plt.hlines(pts_peaks_w[1],pts_peaks_start, pts_peaks_width+pts_peaks_start,color="C3")
-
+plt.plot(pts_peaks_loc, pts_peaks_height, 'x')
  
 
 #Sigh check:
