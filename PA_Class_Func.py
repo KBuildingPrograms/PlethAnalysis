@@ -117,7 +117,7 @@ def postsigh_apnea(normalized_signal, sigh):
 
 def matching_apnea(apnea,apneas):
     return any(
-        apnea >= apnea2 #if there's another apnea that has the same start time as the input, return True
+        apnea2.start_time == apnea #if there's another apnea that has the same start time as the input, return True
         for apnea2 in apneas
     )
 
