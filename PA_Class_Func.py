@@ -1,5 +1,6 @@
 from scipy import signal as scp
 import pandas as pd
+import numpy as np
 
 class Apnea:
     def __init__(self,type,start_time,duration):
@@ -36,6 +37,13 @@ class Sigh:
     def __repr__(self):
         return f"Start: {self.start_time}, Duration: {self.duration}"
 
+def signaltonoise(a, apnea, axis=0, ddof=0):
+    b = a.loc[(apnea.start_time < a['Time'])&(a['Time'] < apnea.width), ['Flow']]
+    b = np.asanyarray(b)
+    m = b.mean(axis)
+    sd = b.std(axis=axis, ddof=ddof)
+    return np.where(sd == 0, 0, m/sd)
+
 def skiprows(iteration):
     skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
     return skiprows
@@ -70,7 +78,6 @@ def peak_analysis(normalized_signal,skiprows):
 
     ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
     ptsp_dataframe = pd.DataFrame(data=ptsp_data)
-    ptsp_dataframe = ptsp_dataframe.sort_values(by='Height',ascending=False)
     return ptsp_dataframe
 
 def peak_means(peak_data):
@@ -81,8 +88,8 @@ def peak_means(peak_data):
 
 def find_sighs(peak_dataframe,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
     sighs = []
-    for _, row in peak_dataframe.iterrows(index=0): #picking the largest peak
-        if row['Height'] > 1.25*peak_height_mean and row['Width'] > 0.7*peak_area_mean: #definitions for a sigh
+    for _, row in peak_dataframe.iterrows(): #picking the largest peak
+        if row['Height'] > 1.25*peak_height_mean and row['Width'] > 1*peak_area_mean: #definitions for a sigh
                 new_sigh = Sigh(row['Start'],row['Width'])
                 sighs.append(new_sigh)
     return sighs

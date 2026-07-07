@@ -144,6 +144,7 @@ class Analysis_Window:
         for sigh in self.sighs:
             axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
         for apnea in self.apneas:
+            print(pa.signaltonoise(self.subsection_data, apnea))
             axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
         toolbar = NavigationToolbar2Tk(canvas, self.window)
         toolbar.update()

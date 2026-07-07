@@ -1,7 +1,7 @@
 from scipy import signal as scp
 import matplotlib.pyplot as plt
 import pandas as pd
-
+import numpy as np
 
 class Apnea:
     def __init__(self,type,start_time,duration):
@@ -29,11 +29,19 @@ class Sigh:
 #im probably going to need to narrow these libraries when I get the chance
 #I think apneas can be saved as dicts
     #apnea = {"start time": x, "duration": [y]}
+iter = 22
+
+def signaltonoise(a, axis=0, ddof=0):
+    a = np.assanyarray(a)
+    m = a.mean(axis)
+    sd = a.std(axis=axis, ddof=ddof)
+    return np.where(sd == 0, 0, m/sd)
+
 
 chunk_value = 20
 sampling_interval = 2000
 Nrows = chunk_value * sampling_interval #total number of rows
-skip_rows = sampling_interval * (3600 + 30) #THIS skips the first hour, this has to update in the final version
+skip_rows = sampling_interval * (3600 + 10*iter) #THIS skips the first hour, this has to update in the final version
 print("Paste the file location of the pleth ASCII (no headings)")
 pleth_location = input()
 pleth_graph_ascii = pleth_location[1:len(pleth_location)-1]
@@ -82,7 +90,7 @@ ptsp_data = {'Time': pts_peaks_loc, 'Height': pts_peaks_height, 'Width': pts_pea
 ptsp_dataframe = pd.DataFrame(data=ptsp_data)
 
 
-ptsp_dataframe=ptsp_dataframe.sort_values(by='Height',ascending=False)
+
 ptsp_mean = ptsp_dataframe['Height'].mean()
 ptsp_area_mean = ptsp_dataframe['Width'].mean() * ptsp_dataframe['Height'].mean()
 
@@ -125,6 +133,8 @@ else: #no sighs? look for type 3s
     i = 0
     while i < len(pts_peaks_width)-1:
         if pts_peaks_start[i+1] - (pts_peaks_start[i] + pts_peaks_width[i]) > 0.8:
+            window = normalized_ps.loc[(pts_peaks_start[i]+pts_peaks_width[i] < normalized_ps['Time']) & (normalized_ps['Time']<pts_peaks_start[i+1])]
+            print(signaltonoise(window['Flow']))
             apnea = Apnea("3", pts_peaks_start[i]+pts_peaks_width[i], pts_peaks_start[i+1], pts_peaks_start[i+1] - (pts_peaks_start[i] + pts_peaks_width[i]))
     i+=1
 
