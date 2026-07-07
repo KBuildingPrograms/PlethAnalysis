@@ -37,8 +37,8 @@ class Sigh:
     def __repr__(self):
         return f"Start: {self.start_time}, Duration: {self.duration}"
 
-def signaltonoise(a, apnea, axis=0, ddof=0):
-    b = a.loc[(apnea.start_time < a['Time'])&(a['Time'] < apnea.width), ['Flow']]
+def signaltonoise(a, apnea=None, axis=0, ddof=0):
+    b = a.loc[(apnea.start_time < a['Time'])&(a['Time'] < apnea.width), ['Flow']] if apnea is not None else np.asanyarray(a['Flow'])
     b = np.asanyarray(b)
     m = b.mean(axis)
     sd = b.std(axis=axis, ddof=ddof)

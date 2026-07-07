@@ -7,7 +7,7 @@ import PA_Class_Func as pa
 import sys
 import traceback
     
-iter = 0
+iter = 326
 
 def update():
     global iter
@@ -102,6 +102,7 @@ class Analysis_Window:
     def acquire_data(self):
         self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
         self.main_data, self.subsection_data = pa.signal_prep(self.file_var.get(),self.skiprows) #acquire the 20 second and 10 second interval
+        print(pa.signaltonoise(self.subsection_data))
     def display_data(self):
         self.table = Table(self.frame_table, dataframe=self.subsection_data, showtoolbar=False, showstatusbar=True)
         self.frame_table.place(relx=0.0,rely=0.0,anchor="nw")
