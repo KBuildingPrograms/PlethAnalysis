@@ -7,17 +7,26 @@ import PA_Class_Func as pa
 import sys
 import traceback
     
-iter = 326
+iter = 0
+loading = 0
 
-def update():
+def loadingbar():
+    global loading
+    loading += 5
+
+def update_iter():
     global iter
     iter += 1
+
+def jump(hour,minute,second):
+    global iter
+    time = int(((hour*3600 - 3600) + (minute*60) + second)/10)
+    iter = time
 
 class PA_IntroWindow: #first window for taking the ascii file name
     def __init__(self,frame):
         self.window = frame #takes the universal Tk
         self.window.title("File Input") #names it after the section
-        self.iter = iter #takes the current iteration based on the global
 
         message = "Welcome to the Plethysmography Analysis Alpha Build. To begin take the ascii data of the plethysmography you want to analyze, remove the headers via notepad, and paste the file path below. Or, if you have a savefile with the place" \
         " you have so far, paste the file location of the savefile."
@@ -66,6 +75,36 @@ class PA_IntroWindow: #first window for taking the ascii file name
             error_note.grid(row=3,column=0)
 
 
+class Controls(Frame):
+    def __init__(self, main):
+        self.window = main.window
+        control = main
+
+        hour = iter//360 + 1
+        minute = (iter - (hour-1)*360)//6
+        second = iter - (hour-1)*360 - (minute*6)
+
+        main.hour_var = IntVar(main.window, hour)
+        main.minute_var = IntVar(main.window, minute)
+        main.second_var = IntVar(main.window, second)
+
+        H_entry = Entry(self.window, textvariable=main.hour_var, font=('calibre',12,'normal'))
+        H_entry.place(relx=0.6, rely=0.8)
+        M_entry = Entry(self.window, textvariable=main.minute_var, font=('calibre',12,'normal'))
+        M_entry.place(relx=0.7, rely=0.8)
+        S_entry = Entry(self.window, textvariable=main.second_var, font=('calibre',12,'normal'))
+        S_entry.place(relx=0.8, rely=0.8)
+        jump = Button(self.window, text='Jump',command=control.jumpto)
+        jump.place(relx = 0.9, rely=0.8)
+
+        next = Button(self.window, text="Next 10 Seconds", command=control.next_loop)
+        next.place(relx=0.75,rely=0.75)
+        
+
+# class Analysis_Methods(): #Moving some of the analysis methods to clean the window
+#     def __init__(self, main):
+        
+#     pass
 
 class Analysis_Window:
     def __init__(self, filename):
@@ -84,14 +123,18 @@ class Analysis_Window:
         self.types = []
         self.question = []
 
-       
+        self.hour_var = IntVar()
+        self.minute_var = IntVar()
+        self.second_var = IntVar()
+
+        self.controls = Controls(self)
+
+        self.acquire_data()
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatonate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
 
-        next = Button(self.window, text="Next 10 Seconds", command=self.next_loop)
-        next.place(relx=0.75,rely=0.75)
     def new_window(self,frame):
         self.window = Toplevel(master=frame)
         self.window.title("AnalysisWindow")
@@ -133,23 +176,32 @@ class Analysis_Window:
         self.subsection_data.plot(x='Time',y='Flow',ax=axes)
         canvas = FigureCanvasTkAgg(fig, master=self.window)
         canvas.draw()
-        for sigh in self.sighs:
+        chunk_s = (sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1])
+        chunk_a = (apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1])
+        for sigh in chunk_s:
             axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
-        for apnea in self.apneas:
-            print(pa.signaltonoise(self.subsection_data, apnea))
+        for apnea in chunk_a:
             axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
         toolbar = NavigationToolbar2Tk(canvas, self.window)
         toolbar.update()
         toolbar.place(relx=1.0,rely=0.5,anchor='e')
         canvas.get_tk_widget().place(relx=1.0,rely=0.0,anchor="ne")
     def next_loop(self):
-        update()
+        update_iter()
         self.acquire_data() #gets next ten seconds
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatonate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
-        print(iter)
+    def refresh(self):
+        self.acquire_data()
+        self.analyze_data()
+        self.concatonate_data()
+        self.display_events()
+        self.summon_graph()
+    def jumpto(self):
+        jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
+        self.refresh()
     def save(self):
         pass
         #sheet 1: current iteration, data filename/location
