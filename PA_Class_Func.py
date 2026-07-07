@@ -62,7 +62,7 @@ def signal_prep(signal_name,skiprows):
     normalized_signal = pleth_section.copy()
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
-    pleth_ten_section = normalized_signal.head(len(normalized_signal) // 2).copy() 
+    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
     pleth_ten_section.plot(x="Time",y="Flow")
 
     return normalized_signal, pleth_ten_section

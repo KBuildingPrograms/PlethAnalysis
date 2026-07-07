@@ -75,10 +75,7 @@ class Analysis_Window:
         self.skiprows = pa.skiprows(iter)
         self.file_var = filename
 
-        self.frame_table = Frame(self.window, width=int(self.width/2), height=int(self.height/2)) #frame for the 10 second datatable that takes up about a half of the screen
-        self.acquire_data()
-
-        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/3)) #frame for the list of all events
+        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/2)) #frame for the list of all events
         self.apneas = []
         self.sighs = []
         self.names = []
@@ -87,7 +84,7 @@ class Analysis_Window:
         self.types = []
         self.question = []
 
-        self.display_data() #displays the main data
+       
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatonate_data()
         self.display_events() #display the list of events from the events dataframe
@@ -102,12 +99,6 @@ class Analysis_Window:
     def acquire_data(self):
         self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
         self.main_data, self.subsection_data = pa.signal_prep(self.file_var.get(),self.skiprows) #acquire the 20 second and 10 second interval
-        print(pa.signaltonoise(self.subsection_data))
-    def display_data(self):
-        self.table = Table(self.frame_table, dataframe=self.subsection_data, showtoolbar=False, showstatusbar=True)
-        self.frame_table.place(relx=0.0,rely=0.0,anchor="nw")
-        self.table.update()
-        self.table.show()
     def analyze_data(self):
         self.peaks = pa.peak_analysis(self.subsection_data,(self.skiprows*(1/2000)))
         self.peaks_mean, self.peaks_area_mean = pa.peak_means(self.peaks)
@@ -133,11 +124,11 @@ class Analysis_Window:
         self.events_dataframe = pd.DataFrame(data=event_data)
     def display_events(self):
         self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=True, showstatusbar=True)
-        self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
+        self.event_frame.place(relx=0.0,rely=0.0,anchor="nw")
         self.event_table.update()
         self.event_table.show()
     def summon_graph(self):
-        fig = Figure(figsize=(6.5,3.5), dpi=110)
+        fig = Figure(figsize=(7,3.5), dpi=110)
         axes = fig.add_subplot()
         self.subsection_data.plot(x='Time',y='Flow',ax=axes)
         canvas = FigureCanvasTkAgg(fig, master=self.window)
@@ -154,7 +145,6 @@ class Analysis_Window:
     def next_loop(self):
         update()
         self.acquire_data() #gets next ten seconds
-        self.display_data() #displays the main data
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatonate_data()
         self.display_events() #display the list of events from the events dataframe
