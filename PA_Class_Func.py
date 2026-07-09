@@ -29,6 +29,9 @@ class Sigh:
         self.start_time = start_time #start of the sigh
         self.width = start_time + duration
         self.questionable = False #whether the sigh could or couldnot potentially be a sniff
+        self.sub_apneas = []
+    def add_subapnea(self,apnea):
+        self.sub_apneas.append(apnea)
     def lack(self):
         self.questionable = True #set when there's no apneas after and it may be just a sniff
     def __str__(self):
@@ -70,13 +73,15 @@ def signal_prep(signal_name,skiprows):
 def peak_analysis(normalized_signal,skiprows):
     sampling_freq = 1/2000
     pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=1.1*normalized_signal['Flow'].std())
+    #pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-0.9)*normalized_signal['Flow'].std())
+    #pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows
     pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows
     pts_peaks_w =scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
     pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
     pts_peaks_width = pts_peaks_w[0]*sampling_freq
     pts_peaks_start = pts_peaks_w[2]*sampling_freq + skiprows
 
-    ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
+    ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start} #"Inverse: pts_inversepeaks_loc"
     ptsp_dataframe = pd.DataFrame(data=ptsp_data)
     return ptsp_dataframe
 
@@ -88,9 +93,9 @@ def peak_means(peak_data):
 
 def find_sighs(peak_dataframe,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
     sighs = []
-    for _, row in peak_dataframe.iterrows(): #picking the largest peak
-        if row['Height'] > 1.25*peak_height_mean and row['Width'] > 1*peak_area_mean: #definitions for a sigh
-                new_sigh = Sigh(row['Start'],row['Width'])
+    for row in peak_dataframe.itertuples(): #picking the largest peak
+        if row.Height > 1.25*peak_height_mean and row.Width > 0.8*peak_area_mean: #and inverse is not None for inverse in row.Inverse if row.Start < inverse < row.Start + 0.05
+                new_sigh = Sigh(row.Start,row.Width)
                 sighs.append(new_sigh)
     return sighs
 
@@ -105,10 +110,11 @@ def postsigh_apnea(normalized_signal, sigh):
     if len(next_sigh) > 0: #if there is a sigh
         extended_peak_view = extended_peaks.loc[next_sigh[0].start_time > extended_peaks['Time']] #condense the extended peak view to end before the next sigh
         while i < len(extended_peak_view) - 2: #While the index is less than the maximum
-            if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999:
+            if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999: 
                 #if the distance between the start of the next peak and the end of the first peak is greater than 0.7999, that means there's an apnea
                 apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i],[extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i])])
                 #the apnea is defined as type 1 or 2, starting at the end of the first peak, and has a duration from the end of the last peak to the start of the next, placed in a list so more duration can be added if needed
+                sigh.add_subapnea(apnea)
                 apneas.append(apnea) #add the apnea to a list of apneas
             i+=1 #move on to next peak
     else:
@@ -116,6 +122,7 @@ def postsigh_apnea(normalized_signal, sigh):
             #same process but iterates from the sigh to 10 seconds after the sigh
             if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
                 apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i],[extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i])])
+                sigh.add_subapnea(apnea)
                 apneas.append(apnea)
             i+=1
     if len(apneas) < 1:
