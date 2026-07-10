@@ -105,6 +105,12 @@ class Controls(Frame):
 
         refresh = Button(self.window, text="Refresh", command=control.summon_graph)
         refresh.place(relx=0.4,rely=0.7)
+
+        save = Button(self.window, text="Save Progress", command=control.save)
+        save.place(relx=0.9,rely=0.9)
+
+        run_till = Button(self.window, text="Run till next detection", command=control.runtill)
+        run_till.place(relx=0.4,rely=0.8)
         
 
 class Analysis_Window:
@@ -210,20 +216,28 @@ class Analysis_Window:
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
-    def refresh(self):
+    def next_process(self):
         self.acquire_data()
         self.analyze_data()
+        self.concatenate_data()
+    def refresh(self):
         self.concatenate_data()
         self.display_events()
         self.summon_graph()
     def jumpto(self):
         jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
         self.refresh()
+    def runtill(self):
+        current = len(self.events_dataframe)
+        while len(self.events_dataframe) < current + 1:
+            update_iter()
+            self.next_process()
+        self.refresh()
+        
     def save(self):
         savefile_data = {"Filename": self.file_var.get(), "Current Iteration": iter, "Events": self.events_dataframe}
         savefile_dataframe = pd.DataFrame(savefile_data)
         savefile_dataframe.to_excel("savefile.xlsx")
-        pass
         #sheet 1: current iteration, data filename/location
         #sheet 2: every sigh and apnea saved so far
 
@@ -233,11 +247,21 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
     def acquire_data(self):
         global iter
         save_data = pd.read_excel(self.file_var.get())
-        filename = save_data['Filename']
+        self.filename = save_data['Filename']
         iter = save_data["Current Iteration"].iloc[0]
         self.events_dataframe = save_data["Events"] #this is not the best way to do this lmao
         self.skiprows = pa.skiprows(iter)
-        self.main_data, self.subsection_data = pa.signal_prep(filename,self.skiprows)
+        self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
+    def next_loop(self):
+        super().next_loop()
+    def refresh(self):
+        super().refresh()
+    def save(self):
+        savefile_data = {"Filename": self.filename, "Current Iteration": iter, "Events": self.events_dataframe}
+        savefile_dataframe = pd.DataFrame(savefile_data)
+        savefile_dataframe.to_excel("savefile.xlsx")
+
+    
         
 
         
