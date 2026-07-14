@@ -72,18 +72,18 @@ def signal_prep(signal_name,skiprows):
 
 def peak_analysis(normalized_signal,skiprows):
     sampling_freq = 1/2000
-    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=1.1*normalized_signal['Flow'].std())
-    #pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-0.9)*normalized_signal['Flow'].std())
-    #pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows
+    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=normalized_signal['Flow'].std())
+    pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-0.8)*normalized_signal['Flow'].std())
+    pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows
     pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows
     pts_peaks_w =scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
     pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
     pts_peaks_width = pts_peaks_w[0]*sampling_freq
     pts_peaks_start = pts_peaks_w[2]*sampling_freq + skiprows
 
-    ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start} #"Inverse: pts_inversepeaks_loc"
+    ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
     ptsp_dataframe = pd.DataFrame(data=ptsp_data)
-    return ptsp_dataframe
+    return ptsp_dataframe, pts_inversepeaks_loc
 
 def peak_means(peak_data):
     ptsp_mean = peak_data['Height'].mean()
@@ -91,20 +91,23 @@ def peak_means(peak_data):
 
     return ptsp_mean, ptsp_area_mean
 
-def find_sighs(peak_dataframe,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
+def find_sighs(peak_dataframe,inverse_data,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
     sighs = []
-    for row in peak_dataframe.itertuples(): #picking the largest peak
-        if row.Height > 1.25*peak_height_mean and row.Width > 0.8*peak_area_mean: #and inverse is not None for inverse in row.Inverse if row.Start < inverse < row.Start + 0.05
-                new_sigh = Sigh(row.Start,row.Width)
+    copy = peak_dataframe.copy()
+    copy.sort_values(by=['Height'])
+    row = copy.head(1).copy()
+    inverse = [x for x in inverse_data if x > row['Start'].iloc[0]+row['Width'].iloc[0]]
+    if row['Height'].iloc[0] > 1.25*peak_height_mean and row['Width'].iloc[0] > 0.8*peak_area_mean and inverse is not None:
+                new_sigh = Sigh(row['Start'],row['Width'])
                 sighs.append(new_sigh)
     return sighs
 
 def postsigh_apnea(normalized_signal, sigh):
     #iterating through sighs
     extended_view = normalized_signal.loc[(sigh.start_time < normalized_signal['Time']) & (normalized_signal['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
-    extended_peaks = peak_analysis(extended_view, extended_view['Time'].iloc[0]) #gets the peaks of that ten second interval
+    extended_peaks, extended_inverse = peak_analysis(extended_view, extended_view['Time'].iloc[0]) #gets the peaks of that ten second interval
     extended_peak_hmean, extended_peak_amean = peak_means(extended_peaks)
-    next_sigh = find_sighs(extended_peaks,extended_peak_hmean, extended_peak_amean) #if there's another sigh within ten seconds, catch it
+    next_sigh = find_sighs(extended_peaks,extended_inverse,extended_peak_hmean, extended_peak_amean) #if there's another sigh within ten seconds, catch it
     i=0 #indexing value for while loops
     apneas = [] #to acquire apneas
     if len(next_sigh) > 0: #if there is a sigh
@@ -148,9 +151,9 @@ def type3_apnea(peak_data, apneas):
 def apnea_combination(normalized_signal, apneas): #I need a way to clean this, good god
     removed_apneas = []
     for apnea in apneas:
-        extended_view = peak_analysis(normalized_signal, apnea.start_time)
+        extended_view, extended_inverse = peak_analysis(normalized_signal, apnea.start_time)
         ev_hmean, ev_amean = peak_means(extended_view)
-        sigh_caught = find_sighs(extended_view,ev_hmean,ev_amean)
+        sigh_caught = find_sighs(extended_view,extended_inverse,ev_hmean,ev_amean)
        
         if len(sigh_caught) > 0:
             for apnea2 in apneas: 

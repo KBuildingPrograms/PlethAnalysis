@@ -1,4 +1,5 @@
 from tkinter import *
+from tkinter.filedialog import askopenfilename
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from pandastable import Table, TableModel
@@ -48,6 +49,9 @@ class PA_IntroWindow: #first window for taking the ascii file name
 
         self.submit = Button(self.window, text="Submit", command=self.file_name) #submits the contents of the textbox to a section that may activate the next window
         self.submit.grid(row=3,column=1)
+
+        self.open_explorer = Button(self.window, text='Open File Folder', command=self.file_selection)
+        self.open_explorer.grid(row=3,column=0)
     def summon_window(self): #summons the next window
         try:
             if self.file_var:
@@ -56,6 +60,13 @@ class PA_IntroWindow: #first window for taking the ascii file name
                 new = Analysis_Savefile(self.savefile_var)
         except Exception as e:
             print(e)
+    def file_selection(self):
+        fn =  askopenfilename()
+        if ".xslx" in fn:
+            self.savefile_var = StringVar(value=fn)
+        else:
+            self.file_var = StringVar(value=fn)
+        self.summon_window()
     def file_name(self):
         e = "" #to update error message
         try:
@@ -85,7 +96,7 @@ class Controls(Frame):
 
         hour = iter//360 + 1
         minute = (iter - (hour-1)*360)//6
-        second = iter - (hour-1)*360 - (minute*6)
+        second = (iter - (hour-1)*360 - (minute*6))*10
 
         main.hour_var = IntVar(main.window, hour)
         main.minute_var = IntVar(main.window, minute)
@@ -98,20 +109,29 @@ class Controls(Frame):
         S_entry = Entry(self.window, textvariable=main.second_var, font=('calibre',12,'normal'))
         S_entry.place(relx=0.8, rely=0.8)
         jump = Button(self.window, text='Jump',command=control.jumpto)
-        jump.place(relx = 1.0, rely=0.8)
+        jump.place(relx = 0.8, rely=0.85)
 
         next = Button(self.window, text="Next 10 Seconds", command=control.next_loop)
-        next.place(relx=0.4,rely=0.75)
+        next.place(relx=0.45,rely=0.75)
 
-        refresh = Button(self.window, text="Refresh", command=control.summon_graph)
-        refresh.place(relx=0.4,rely=0.7)
+        refresh = Button(self.window, text="Refresh", command=control.refresh)
+        refresh.place(relx=0.45,rely=0.7)
 
         save = Button(self.window, text="Save Progress", command=control.save)
         save.place(relx=0.9,rely=0.9)
 
         run_till = Button(self.window, text="Run till next detection", command=control.runtill)
-        run_till.place(relx=0.4,rely=0.8)
-        
+        run_till.place(relx=0.45,rely=0.8)
+    def update_time(self, main):
+        hour = iter//360 + 1
+        minute = (iter - (hour-1)*360)//6
+        second = (iter - (hour-1)*360 - (minute*6))*10
+
+        main.hour_var.set(hour)
+        main.minute_var.set(minute)
+        main.second_var.set(second)
+
+    
 
 class Analysis_Window:
     def __init__(self, filename):
@@ -152,16 +172,16 @@ class Analysis_Window:
         self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
         self.main_data, self.subsection_data = pa.signal_prep(self.file_var.get(),self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.peaks = pa.peak_analysis(self.subsection_data,(self.skiprows*(1/2000)))
+        self.peaks, self.inverse = pa.peak_analysis(self.subsection_data,(self.skiprows*(1/2000)))
         self.peaks_mean, self.peaks_area_mean = pa.peak_means(self.peaks)
-        self.sighs = pa.find_sighs(self.peaks,self.peaks_mean,self.peaks_area_mean)
+        self.sighs = pa.find_sighs(self.peaks,self.inverse,self.peaks_mean,self.peaks_area_mean)
         for sigh in self.sighs or []:
                 self.apneas = pa.postsigh_apnea(self.main_data,sigh)
         self.apneas = pa.type3_apnea(self.peaks, self.apneas)
         self.apneas = pa.apnea_combination(self.main_data,self.apneas)
     def concatenate_data(self):
-        chunk_s = (sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1])
-        chunk_a = (apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1])
+        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1]]
+        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1]]
         for sigh in chunk_s:
             self.names.append(sigh.name)
             self.starts.append(sigh.start_time)
@@ -176,8 +196,8 @@ class Analysis_Window:
             self.types.append(apnea.type)
             self.question.append("N/A")
             self.subapneas.append(apnea.sub_apneas)
-        event_data = {"Event": self.names, "Start": self.starts, "Duration": self.durations, "Type": self.types, "Questionable": self.question, "Subapneas": self.subapneas}
-        self.events_dataframe = pd.concat([self.events_dataframe,pd.DataFrame(data=event_data)]) 
+        self.event_data = {"Event": self.names, "Start": self.starts, "Duration": self.durations, "Type": self.types, "Questionable": self.question, "Subapneas": self.subapneas}
+        self.events_dataframe = pd.DataFrame(self.event_data)
     def display_events(self):
         self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=True)
         self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
@@ -185,15 +205,13 @@ class Analysis_Window:
         self.event_table.show()
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
-        print(new)
         new_events = self.events_dataframe.tail(new).copy()
-        print(new_events)
-        new_a = [pa.Apnea(row['Type'],row['Start'],row['Duration']) for _, row in new_events.iterrows() if row['Event'].upper()=='APNEA']
+        new_a = [pa.Apnea(row['Type'],row['Start'],[row['Duration']]) for _, row in new_events.iterrows() if row['Event'].upper()=='APNEA']
         new_s = [pa.Sigh(row['Start'],row['Duration']) for _, row in new_events.iterrows() if row['Event'].upper()=='SIGH']
         self.apneas.extend(new_a)
         self.sighs.extend(new_s)
     def summon_graph(self):
-        self.update_events()
+        #self.update_events()
         fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
         axes = fig.add_subplot()
         self.subsection_data.plot(x='Time',y='Flow',ax=axes,grid=True)
@@ -216,16 +234,18 @@ class Analysis_Window:
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
+        self.controls.update_time(self)
     def next_process(self):
         self.acquire_data()
         self.analyze_data()
         self.concatenate_data()
     def refresh(self):
-        self.concatenate_data()
         self.display_events()
         self.summon_graph()
+        self.controls.update_time(self)
     def jumpto(self):
         jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
+        self.concatenate_data()
         self.refresh()
     def runtill(self):
         current = len(self.events_dataframe)
@@ -235,21 +255,21 @@ class Analysis_Window:
         self.refresh()
         
     def save(self):
-        savefile_data = {"Filename": self.file_var.get(), "Current Iteration": iter, "Events": self.events_dataframe}
+        savefile_data = {"Filename": self.file_var.get(), "Current Iteration": iter}
         savefile_dataframe = pd.DataFrame(savefile_data)
-        savefile_dataframe.to_excel("savefile.xlsx")
-        #sheet 1: current iteration, data filename/location
-        #sheet 2: every sigh and apnea saved so far
+        savefile_dataframe.to_excel("savefile.xlsx",sheet_name='Sheet1')
+        self.events_dataframe.to_excel("sacefile.xlsx", sheet_name='Sheet2')
 
 #I think I'll make a second analysis window type for loading data
 
 class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods to clean the window
     def acquire_data(self):
         global iter
-        save_data = pd.read_excel(self.file_var.get())
+        save_data = pd.read_excel(self.file_var.get(),sheet_name=0)
+        self.events_dataframe = pd.read_excel(self.file_var.get(),sheet_name=1)
         self.filename = save_data['Filename']
         iter = save_data["Current Iteration"].iloc[0]
-        self.events_dataframe = save_data["Events"] #this is not the best way to do this lmao
+        self.events_data = self.events_dataframe.to_dict("list") #this is not the best way to do this lmao
         self.skiprows = pa.skiprows(iter)
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
     def next_loop(self):
