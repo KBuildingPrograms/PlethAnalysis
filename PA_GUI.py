@@ -127,6 +127,9 @@ class Controls(Frame):
 
         add = Button(self.window, text="Add Event", command=main.get_event)
         add.place(relx=0.42,rely=0.8)
+
+        remove = Button(self.window, text="Remove Event", command=main.removal_loc)
+        remove.place(relx=0.42, rely=0.85)
     def update_time(self, main):
         hour = iter//360 + 1
         minute = (iter - (hour-1)*360)//6
@@ -160,9 +163,8 @@ class Controls(Frame):
         cb_subapnea.place(relx=0.85,rely=0.8)
 
         def submit():
-            new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),[duration_var.get()],subapnea=[cb_subapnea.get()]), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()])}
+            new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()]), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()])}
             main.input_event = new_events.get(cb.get(), None)
-            print(main.input_event)
             main.add_event()
             cb.destroy()
             time_entry.destroy()
@@ -179,33 +181,50 @@ class Controls(Frame):
         cb.set("Event to Delete")
         cb.place(relx=0.6, rely=0.8)
         loc = int(cb.get()) - 1
+        def submit():
+            main.event_loc = loc
+            cb.destroy()
+            submit_button.destroy()
+            main.removal()
         
-        pass
+        submit_button = Button(self.window, text="Submit", command=submit)
+        submit_button.place(relx=0.7, rely=0.8)
+
     def edit_info(self,main):
         event_list = main.events_dataframe.values.tolist()
         cb = ttk.Combobox(self.window, values=event_list)
         cb.set("Event to Edit")
         cb.place(relx=0.6, rely=0.8)
         event_edited = cb.current()
-        
-        start_var = DoubleVar(self.window, value=event_list[event_edited])
-        time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
-        time_entry.place(relx=0.62,rely=0.8)
+        def submit_loc():
+            start_var = DoubleVar(self.window, value=event_list[event_edited[1]])
+            time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
+            time_entry.place(relx=0.62,rely=0.8)
 
-        duration_var = DoubleVar(self.window)
-        duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
-        duration_entry.place(relx=0.65,rely=0.75)
+            duration_var = DoubleVar(self.window, value=event_list[event_edited[2]])
+            duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
+            duration_entry.place(relx=0.65,rely=0.75)
 
-        types = ['1/2','3','N/A']
-        cb_type = ttk.Combobox(self.window, values=types)
-        cb_type.set("Type?")
-        cb_type.place(relx=0.7,rely=0.75)
+            types = ['1/2','3','N/A']
+            cb_type = ttk.Combobox(self.window, values=types)
+            cb_type.set("Type?")
+            cb_type.place(relx=0.7,rely=0.75)
 
-        sub_events = main.apneas
-        sub_events.insert(0,'')
-        cb_subapnea = ttk.Combobox(self.window, values=sub_events)
-        cb_subapnea.set("Sub Apbeas?")
-        cb_subapnea.place(relx=0.75,rely=0.75)
+            sub_events = main.apneas
+            sub_events.insert(0,'')
+            cb_subapnea = ttk.Combobox(self.window, values=sub_events)
+            cb_subapnea.set("Sub Apbeas?")
+            cb_subapnea.place(relx=0.75,rely=0.75)
+            submit_button.destroy()
+            def submit_edits():
+                new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()]), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()])}
+                main.input_event = new_events.get(event_list[event_edited[0]], None)
+                pass
+            submit_edit_button = Button(self.window, text="Submit Edits", command=submit_edits)
+            submit_edit_button.place(relx=0.7, rely=0.8)
+            pass
+        submit_button = Button(self.window, text="Submit", command=submit_loc)
+        submit_button.place(relx=0.7, rely=0.8)
         pass
 
 
@@ -287,7 +306,7 @@ class Analysis_Window:
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
         new_events = self.events_dataframe.tail(new).copy()
-        new_a = [pa.Apnea(row['Type'],row['Start'],[row['Duration']]) for _, row in new_events.iterrows() if row['Event'].upper()=='APNEA']
+        new_a = [pa.Apnea(row['Type'],row['Start'],row['Duration']) for _, row in new_events.iterrows() if row['Event'].upper()=='APNEA']
         new_s = [pa.Sigh(row['Start'],row['Duration']) for _, row in new_events.iterrows() if row['Event'].upper()=='SIGH']
         self.apneas.extend(new_a)
         self.sighs.extend(new_s)
@@ -302,12 +321,25 @@ class Analysis_Window:
             pass
         self.concatenate_data()
         self.input_event = None
+    def removal_loc(self):
+        self.controls.del_info(self)
     def remove_event(self):
-        pass
+        key_s = (sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time)
+        key_a = (apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time)
+        if key_a is not None:
+            self.apneas.pop(self.apneas.index(key_a[0]))
+        if key_s is not None:
+            self.sighs.pop(self.apneas.index(key_s[0]))
+        self.events_dataframe.drop([self.event_loc])
+        for key in self.event_data:
+            self.event_data.get(key).pop(self.event_loc)
+        self.event_loc = None
+    def edit_loc(self):
+        self.controls.edit_info(self)
     def edit_event(self):
+
         pass
     def summon_graph(self):
-        #self.update_events()
         fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
         axes = fig.add_subplot()
         self.subsection_data.plot(x='Time',y='Flow',ax=axes,grid=True)

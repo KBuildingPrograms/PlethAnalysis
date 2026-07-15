@@ -7,12 +7,11 @@ class Apnea:
         self.name = "Apnea"
         self.duration = duration #list of durations for the apneas
         self.start_time = start_time #the start of the first major apnea
-        self.width = start_time + duration[0]
+        self.width = start_time + duration
         self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
         self.sub_apneas = subapnea if subapnea is not None else []
     def add_subapnea(self,apnea):
         self.sub_apneas.append(apnea)
-        self.duration.append(apnea.duration[0])
     def __str__(self): #information for use via print function
         return f"Type: {self.type}, Start: {self.start_time}, Duration: {self.duration}"
     def __repr__(self):
@@ -39,6 +38,8 @@ class Sigh:
         return f"Start: {self.start_time}, Duration: {self.duration}"
     def __repr__(self):
         return f"Start: {self.start_time}, Duration: {self.duration}"
+    def __eq__(self,sigh2):
+        return self.start_time == sigh2.start_time
 
 def signaltonoise(a, apnea=None, axis=0, ddof=0):
     b = a.loc[(apnea.start_time < a['Time'])&(a['Time'] < apnea.width), ['Flow']] if apnea is not None else np.asanyarray(a['Flow'])
@@ -115,7 +116,7 @@ def postsigh_apnea(normalized_signal, sigh):
         while i < len(extended_peak_view) - 2: #While the index is less than the maximum
             if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999: 
                 #if the distance between the start of the next peak and the end of the first peak is greater than 0.7999, that means there's an apnea
-                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i],[extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i])])
+                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i],extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i]))
                 #the apnea is defined as type 1 or 2, starting at the end of the first peak, and has a duration from the end of the last peak to the start of the next, placed in a list so more duration can be added if needed
                 sigh.add_subapnea(apnea)
                 apneas.append(apnea) #add the apnea to a list of apneas
@@ -124,7 +125,7 @@ def postsigh_apnea(normalized_signal, sigh):
         while i < len(extended_peaks) - 2:
             #same process but iterates from the sigh to 10 seconds after the sigh
             if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
-                apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i],[extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i])])
+                apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i],extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i]))
                 sigh.add_subapnea(apnea)
                 apneas.append(apnea)
             i+=1
@@ -143,7 +144,7 @@ def type3_apnea(peak_data, apneas):
     while i < len(peak_data) - 2:
         if peak_data["Start"].iloc[i+1] - (peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i]) > 0.7999 and (not matching_apnea(peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i],apneas)): 
              #if there's a gap in the peaks big enough for an apnea AND it's not an apnea already saved, it's a type 3
-             apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], [peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i])])
+             apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i]))
              apneas.append(apnea)
         i+=1
     return apneas
