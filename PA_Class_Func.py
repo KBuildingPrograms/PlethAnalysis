@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 
 class Apnea:
-    def __init__(self,type,start_time,duration):
+    def __init__(self,type,start_time,duration,subapnea=None):
         self.name = "Apnea"
         self.duration = duration #list of durations for the apneas
         self.start_time = start_time #the start of the first major apnea
         self.width = start_time + duration[0]
         self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
-        self.sub_apneas = []
+        self.sub_apneas = subapnea if subapnea is not None else []
     def add_subapnea(self,apnea):
         self.sub_apneas.append(apnea)
         self.duration.append(apnea.duration[0])
@@ -23,13 +23,13 @@ class Apnea:
         return self.start_time == apnea2.start_time
     
 class Sigh:
-    def __init__(self,start_time,duration):
+    def __init__(self,start_time,duration,subapnea=None):
         self.name = "Sigh"
         self.duration = duration #duration of sigh based on width
         self.start_time = start_time #start of the sigh
         self.width = start_time + duration
         self.questionable = False #whether the sigh could or couldnot potentially be a sniff
-        self.sub_apneas = []
+        self.sub_apneas = subapnea if subapnea is not None else []
     def add_subapnea(self,apnea):
         self.sub_apneas.append(apnea)
     def lack(self):

@@ -1,5 +1,6 @@
 from tkinter import *
-from tkinter.filedialog import askopenfilename
+from tkinter import ttk
+from tkinter.filedialog import askopenfilename, askdirectory
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from pandastable import Table, TableModel
@@ -9,11 +10,10 @@ import sys
 import traceback
     
 iter = 0
-loading = 0
 
-def loadingbar():
-    global loading
-    loading += 5
+def reset():
+    global iter
+    iter = 0
 
 def update_iter():
     global iter
@@ -64,8 +64,10 @@ class PA_IntroWindow: #first window for taking the ascii file name
         fn =  askopenfilename()
         if ".xslx" in fn:
             self.savefile_var = StringVar(value=fn)
-        else:
+        elif ".ascii" in fn:
             self.file_var = StringVar(value=fn)
+        else:
+            pass
         self.summon_window()
     def file_name(self):
         e = "" #to update error message
@@ -103,25 +105,28 @@ class Controls(Frame):
         main.second_var = IntVar(main.window, second)
 
         H_entry = Entry(self.window, textvariable=main.hour_var, font=('calibre',12,'normal'))
-        H_entry.place(relx=0.6, rely=0.8)
+        H_entry.place(relx=0.6, rely=0.6)
         M_entry = Entry(self.window, textvariable=main.minute_var, font=('calibre',12,'normal'))
-        M_entry.place(relx=0.7, rely=0.8)
+        M_entry.place(relx=0.7, rely=0.6)
         S_entry = Entry(self.window, textvariable=main.second_var, font=('calibre',12,'normal'))
-        S_entry.place(relx=0.8, rely=0.8)
+        S_entry.place(relx=0.8, rely=0.6)
         jump = Button(self.window, text='Jump',command=control.jumpto)
-        jump.place(relx = 0.8, rely=0.85)
+        jump.place(relx = 0.8, rely=0.65)
 
         next = Button(self.window, text="Next 10 Seconds", command=control.next_loop)
-        next.place(relx=0.45,rely=0.75)
+        next.place(relx=0.42,rely=0.65)
 
         refresh = Button(self.window, text="Refresh", command=control.refresh)
-        refresh.place(relx=0.45,rely=0.7)
+        refresh.place(relx=0.42,rely=0.7)
 
         save = Button(self.window, text="Save Progress", command=control.save)
         save.place(relx=0.9,rely=0.9)
 
         run_till = Button(self.window, text="Run till next detection", command=control.runtill)
-        run_till.place(relx=0.45,rely=0.8)
+        run_till.place(relx=0.42,rely=0.75)
+
+        add = Button(self.window, text="Add Event", command=main.get_event)
+        add.place(relx=0.42,rely=0.8)
     def update_time(self, main):
         hour = iter//360 + 1
         minute = (iter - (hour-1)*360)//6
@@ -130,6 +135,79 @@ class Controls(Frame):
         main.hour_var.set(hour)
         main.minute_var.set(minute)
         main.second_var.set(second)
+    def add_info(self,main):
+        events = ['Sigh','Apnea','None']
+        cb = ttk.Combobox(self.window, values=events)
+        cb.set("Event")
+        cb.place(relx=0.58,rely=0.8)
+
+        start_var = DoubleVar(self.window)
+        time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
+        time_entry.place(relx=0.68,rely=0.8)
+
+        duration_var = DoubleVar(self.window)
+        duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
+        duration_entry.place(relx=0.72,rely=0.8)
+
+        types = ['1/2','3','N/A']
+        cb_type = ttk.Combobox(self.window, values=types)
+        cb_type.set("Type?")
+        cb_type.place(relx=0.75,rely=0.8)
+
+        sub_events = ['']+main.apneas
+        cb_subapnea = ttk.Combobox(self.window, values=sub_events)
+        cb_subapnea.set("Sub Apbeas?")
+        cb_subapnea.place(relx=0.85,rely=0.8)
+
+        def submit():
+            new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),[duration_var.get()],subapnea=[cb_subapnea.get()]), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()])}
+            main.input_event = new_events.get(cb.get(), None)
+            print(main.input_event)
+            main.add_event()
+            cb.destroy()
+            time_entry.destroy()
+            duration_entry.destroy()
+            cb_type.destroy()
+            cb_subapnea.destroy()
+            submit_button.destroy()
+
+        submit_button = Button(self.window, text="Submit Event", command=submit)
+        submit_button.place(relx=0.75,rely=0.85)
+    def del_info(self, main):
+        event_list = list(range(1,len(main.events_dataframe)+1))
+        cb = ttk.Combobox(self.window, values=event_list)
+        cb.set("Event to Delete")
+        cb.place(relx=0.6, rely=0.8)
+        loc = int(cb.get()) - 1
+        
+        pass
+    def edit_info(self,main):
+        event_list = main.events_dataframe.values.tolist()
+        cb = ttk.Combobox(self.window, values=event_list)
+        cb.set("Event to Edit")
+        cb.place(relx=0.6, rely=0.8)
+        event_edited = cb.current()
+        
+        start_var = DoubleVar(self.window, value=event_list[event_edited])
+        time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
+        time_entry.place(relx=0.62,rely=0.8)
+
+        duration_var = DoubleVar(self.window)
+        duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
+        duration_entry.place(relx=0.65,rely=0.75)
+
+        types = ['1/2','3','N/A']
+        cb_type = ttk.Combobox(self.window, values=types)
+        cb_type.set("Type?")
+        cb_type.place(relx=0.7,rely=0.75)
+
+        sub_events = main.apneas
+        sub_events.insert(0,'')
+        cb_subapnea = ttk.Combobox(self.window, values=sub_events)
+        cb_subapnea.set("Sub Apbeas?")
+        cb_subapnea.place(relx=0.75,rely=0.75)
+        pass
+
 
     
 
@@ -151,6 +229,9 @@ class Analysis_Window:
         self.types = []
         self.question = []
         self.subapneas = []
+
+        self.input_event = None
+        self.event_loc = None
 
         self.hour_var = IntVar()
         self.minute_var = IntVar()
@@ -180,8 +261,8 @@ class Analysis_Window:
         self.apneas = pa.type3_apnea(self.peaks, self.apneas)
         self.apneas = pa.apnea_combination(self.main_data,self.apneas)
     def concatenate_data(self):
-        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1]]
-        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1]]
+        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.starts]
+        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.starts]
         for sigh in chunk_s:
             self.names.append(sigh.name)
             self.starts.append(sigh.start_time)
@@ -210,6 +291,21 @@ class Analysis_Window:
         new_s = [pa.Sigh(row['Start'],row['Duration']) for _, row in new_events.iterrows() if row['Event'].upper()=='SIGH']
         self.apneas.extend(new_a)
         self.sighs.extend(new_s)
+    def get_event(self):
+        self.controls.add_info(self)
+    def add_event(self):
+        if isinstance(self.input_event, pa.Apnea):
+            self.apneas.append(self.input_event)
+        elif isinstance(self.input_event, pa.Sigh):
+            self.sighs.append(self.input_event)
+        else:
+            pass
+        self.concatenate_data()
+        self.input_event = None
+    def remove_event(self):
+        pass
+    def edit_event(self):
+        pass
     def summon_graph(self):
         #self.update_events()
         fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
@@ -253,12 +349,14 @@ class Analysis_Window:
             update_iter()
             self.next_process()
         self.refresh()
-        
     def save(self):
-        savefile_data = {"Filename": self.file_var.get(), "Current Iteration": iter}
-        savefile_dataframe = pd.DataFrame(savefile_data)
-        savefile_dataframe.to_excel("savefile.xlsx",sheet_name='Sheet1')
-        self.events_dataframe.to_excel("sacefile.xlsx", sheet_name='Sheet2')
+        sfn = askdirectory()
+        subname = self.file_var.get() - " ASCII file.ascii"
+        writer = pd.ExcelWriter(f"{sfn}\\{subname}-savefile.xlsx", engine='xlsxwriter')
+        savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
+        savefile_dataframe = pd.DataFrame(data=savefile_data)
+        savefile_dataframe.to_excel(writer,sheet_name='Sheet1')
+        self.events_dataframe.to_excel(writer, sheet_name='Sheet2')
 
 #I think I'll make a second analysis window type for loading data
 
@@ -266,7 +364,9 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
     def acquire_data(self):
         global iter
         save_data = pd.read_excel(self.file_var.get(),sheet_name=0)
+        print(save_data)
         self.events_dataframe = pd.read_excel(self.file_var.get(),sheet_name=1)
+        print(self.events_dataframe)
         self.filename = save_data['Filename']
         iter = save_data["Current Iteration"].iloc[0]
         self.events_data = self.events_dataframe.to_dict("list") #this is not the best way to do this lmao
@@ -277,9 +377,11 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
     def refresh(self):
         super().refresh()
     def save(self):
-        savefile_data = {"Filename": self.filename, "Current Iteration": iter, "Events": self.events_dataframe}
-        savefile_dataframe = pd.DataFrame(savefile_data)
-        savefile_dataframe.to_excel("savefile.xlsx")
+        writer = pd.ExcelWriter(self.file_var.get(), engine='xlsxwriter')
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
+        savefile_dataframe = pd.DataFrame(data=savefile_data)
+        savefile_dataframe.to_excel(writer,sheet_name='Sheet1')
+        self.events_dataframe.to_excel(writer, sheet_name='Sheet2')
 
     
         
