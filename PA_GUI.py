@@ -1,6 +1,6 @@
 from tkinter import *
 from tkinter import ttk
-from tkinter.filedialog import askopenfilename, askdirectory
+from tkinter.filedialog import askopenfilename, asksaveasfilename
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from pandastable import Table, TableModel
@@ -8,8 +8,13 @@ import pandas as pd
 import PA_Class_Func as pa
 import sys
 import traceback
+from pathlib import Path
     
 iter = 0
+
+def escape():
+    return True
+
 
 def reset():
     global iter
@@ -54,15 +59,16 @@ class PA_IntroWindow: #first window for taking the ascii file name
         self.open_explorer.grid(row=3,column=0)
     def summon_window(self): #summons the next window
         try:
-            if self.file_var:
+            if self.file_var.get():
                 new = Analysis_Window(self.file_var) #initiates the next window
-            elif self.savefile_var:
+            elif self.savefile_var.get():
                 new = Analysis_Savefile(self.savefile_var)
         except Exception as e:
             print(e)
     def file_selection(self):
         fn =  askopenfilename()
-        if ".xslx" in fn:
+        print(fn)
+        if ".xlsx" in fn:
             self.savefile_var = StringVar(value=fn)
         elif ".ascii" in fn:
             self.file_var = StringVar(value=fn)
@@ -130,6 +136,9 @@ class Controls(Frame):
 
         remove = Button(self.window, text="Remove Event", command=main.removal_loc)
         remove.place(relx=0.42, rely=0.85)
+
+        edit = Button(self.window, text="Edit Event", command=main.edit_loc)
+        edit.place(relx=0.42, rely=0.9)
     def update_time(self, main):
         hour = iter//360 + 1
         minute = (iter - (hour-1)*360)//6
@@ -172,7 +181,17 @@ class Controls(Frame):
             cb_type.destroy()
             cb_subapnea.destroy()
             submit_button.destroy()
-
+        def escape(event):
+            print("Yep, something happened")
+            print(event)
+            cb.destroy()
+            time_entry.destroy()
+            duration_entry.destroy()
+            cb_type.destroy()
+            cb_subapnea.destroy()
+            submit_button.destroy()
+        
+        self.window.bind('<Escape>', escape)
         submit_button = Button(self.window, text="Submit Event", command=submit)
         submit_button.place(relx=0.75,rely=0.85)
     def del_info(self, main):
@@ -180,13 +199,19 @@ class Controls(Frame):
         cb = ttk.Combobox(self.window, values=event_list)
         cb.set("Event to Delete")
         cb.place(relx=0.6, rely=0.8)
-        loc = int(cb.get()) - 1
         def submit():
+            loc = int(cb.get()) - 1
             main.event_loc = loc
             cb.destroy()
             submit_button.destroy()
-            main.removal()
+            main.remove_event()
+        def escape(event):
+            print("Yep, something happened")
+            print(event)
+            cb.destroy()
+            submit_button.destroy()
         
+        self.window.bind('<Escape>', escape)
         submit_button = Button(self.window, text="Submit", command=submit)
         submit_button.place(relx=0.7, rely=0.8)
 
@@ -194,14 +219,16 @@ class Controls(Frame):
         event_list = main.events_dataframe.values.tolist()
         cb = ttk.Combobox(self.window, values=event_list)
         cb.set("Event to Edit")
-        cb.place(relx=0.6, rely=0.8)
-        event_edited = cb.current()
+        cb.place(relx=0.5, rely=0.9)
         def submit_loc():
-            start_var = DoubleVar(self.window, value=event_list[event_edited[1]])
+            event_loc = cb.current() - 1
+            event_edited = event_list[event_loc]
+            cb.destroy()
+            start_var = DoubleVar(self.window, value=event_edited[1])
             time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
             time_entry.place(relx=0.62,rely=0.8)
 
-            duration_var = DoubleVar(self.window, value=event_list[event_edited[2]])
+            duration_var = DoubleVar(self.window, value=event_edited[2])
             duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
             duration_entry.place(relx=0.65,rely=0.75)
 
@@ -219,13 +246,35 @@ class Controls(Frame):
             def submit_edits():
                 new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()]), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()])}
                 main.input_event = new_events.get(event_list[event_edited[0]], None)
-                pass
+                main.event_loc = event_loc
+                main.edit_event()
+
+                time_entry.destroy()
+                duration_entry.destroy()
+                cb_type.destroy()
+                cb_subapnea.destroy()
+                submit_edit_button.destroy()
+            def escape2(event):
+                print("Yep, something happened")
+                print(event)
+                cb.destroy()
+                time_entry.destroy()
+                duration_entry.destroy()
+                cb_type.destroy()
+                cb_subapnea.destroy()
+                submit_edit_button.destroy()
+            self.window.bind('<Escape>', escape2)
             submit_edit_button = Button(self.window, text="Submit Edits", command=submit_edits)
-            submit_edit_button.place(relx=0.7, rely=0.8)
-            pass
+            submit_edit_button.place(relx=0.7, rely=0.9)
+        def escape(event):
+            print("Yep, something happened")
+            print(event)
+            cb.destroy()
+            submit_button.destroy()
+        
+        self.window.bind('<Escape>', escape)
         submit_button = Button(self.window, text="Submit", command=submit_loc)
         submit_button.place(relx=0.7, rely=0.8)
-        pass
 
 
     
@@ -237,6 +286,7 @@ class Analysis_Window:
         self.height = self.window.winfo_height() #and height of the current window for future reference
         self.skiprows = pa.skiprows(iter)
         self.file_var = filename
+        self.filename = self.file_var.get()
 
         self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
         self.events_dataframe = pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
@@ -270,7 +320,7 @@ class Analysis_Window:
         self.window.state('zoomed')
     def acquire_data(self):
         self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
-        self.main_data, self.subsection_data = pa.signal_prep(self.file_var.get(),self.skiprows) #acquire the 20 second and 10 second interval
+        self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
         self.peaks, self.inverse = pa.peak_analysis(self.subsection_data,(self.skiprows*(1/2000)))
         self.peaks_mean, self.peaks_area_mean = pa.peak_means(self.peaks)
@@ -292,7 +342,7 @@ class Analysis_Window:
         for apnea in chunk_a:
             self.names.append(apnea.name)
             self.starts.append(apnea.start_time)
-            self.durations.append(apnea.duration[0])
+            self.durations.append(apnea.duration)
             self.types.append(apnea.type)
             self.question.append("N/A")
             self.subapneas.append(apnea.sub_apneas)
@@ -324,21 +374,39 @@ class Analysis_Window:
     def removal_loc(self):
         self.controls.del_info(self)
     def remove_event(self):
-        key_s = (sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time)
-        key_a = (apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time)
-        if key_a is not None:
+        key_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
+        key_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time]
+        if key_a:
+            pa.removefromlists(key_a[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
             self.apneas.pop(self.apneas.index(key_a[0]))
-        if key_s is not None:
+        if key_s:
+            pa.removefromlists(key_s[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
             self.sighs.pop(self.apneas.index(key_s[0]))
         self.events_dataframe.drop([self.event_loc])
         for key in self.event_data:
             self.event_data.get(key).pop(self.event_loc)
         self.event_loc = None
+        self.display_events()
+        self.refresh()
     def edit_loc(self):
         self.controls.edit_info(self)
     def edit_event(self):
-
-        pass
+        old_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time]
+        old_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
+        if old_a:
+            pa.editinlists(old_a[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
+            self.event_data = {"Event": self.names, "Start": self.starts, "Duration": self.durations, "Type": self.types, "Questionable": self.question, "Subapneas": self.subapneas}
+            self.events_dataframe = pd.DataFrame(self.event_data) 
+            inner_index = self.apneas.index(old_a[0]) 
+            self.apneas.pop(inner_index)
+            self.apneas.insert(inner_index)
+        if old_s:
+            pa.editinlists(old_s[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
+            self.event_data = {"Event": self.names, "Start": self.starts, "Duration": self.durations, "Type": self.types, "Questionable": self.question, "Subapneas": self.subapneas}
+            self.events_dataframe = pd.DataFrame(self.event_data)
+            inner_index = self.sighs.index(old_s[0]) 
+            self.sighs.pop(inner_index)
+            self.sighs.insert(inner_index)
     def summon_graph(self):
         fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
         axes = fig.add_subplot()
@@ -382,39 +450,62 @@ class Analysis_Window:
             self.next_process()
         self.refresh()
     def save(self):
-        sfn = askdirectory()
-        subname = self.file_var.get() - " ASCII file.ascii"
-        writer = pd.ExcelWriter(f"{sfn}\\{subname}-savefile.xlsx", engine='xlsxwriter')
         savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
         savefile_dataframe = pd.DataFrame(data=savefile_data)
-        savefile_dataframe.to_excel(writer,sheet_name='Sheet1')
-        self.events_dataframe.to_excel(writer, sheet_name='Sheet2')
+        savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
+        if savefile_path:
+            with pd.ExcelWriter(savefile_path, engine='xlsxwriter') as writer:
+                savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
+                self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
 
 #I think I'll make a second analysis window type for loading data
 
+
+
+
+
+
 class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods to clean the window
-    def acquire_data(self):
+    def __init__(self,filename):
+        self.file_var = filename
+        self.acquire_savedata()
+        self.new_window(window) #makes a new window based off of the master Tk window
+        self.width = self.window.winfo_width() #takes the width 
+        self.height = self.window.winfo_height() #and height of the current window for future reference
+        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
+        
+        self.apneas = pa.frametoapnea(self.events_dataframe)
+        self.sighs = pa.frametosighs(self.events_dataframe)
+
+        self.input_event = None
+        self.event_loc = None
+
+        self.hour_var = IntVar()
+        self.minute_var = IntVar()
+        self.second_var = IntVar()
+
+        self.controls = Controls(self)
+
+        self.names, self.starts, self.durations, self.types, self.question, self.subapneas = pa.eventstolist(self.events_dataframe)
+        self.display_events() #display the list of events from the events dataframe
+        self.summon_graph()
+    def acquire_savedata(self):
         global iter
         save_data = pd.read_excel(self.file_var.get(),sheet_name=0)
-        print(save_data)
         self.events_dataframe = pd.read_excel(self.file_var.get(),sheet_name=1)
-        print(self.events_dataframe)
-        self.filename = save_data['Filename']
+        self.filename = save_data['Filename'].iloc[0]
         iter = save_data["Current Iteration"].iloc[0]
-        self.events_data = self.events_dataframe.to_dict("list") #this is not the best way to do this lmao
+        self.events_data = self.events_dataframe.to_dict("list")
         self.skiprows = pa.skiprows(iter)
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
-    def next_loop(self):
-        super().next_loop()
-    def refresh(self):
-        super().refresh()
     def save(self):
-        writer = pd.ExcelWriter(self.file_var.get(), engine='xlsxwriter')
         savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
         savefile_dataframe = pd.DataFrame(data=savefile_data)
-        savefile_dataframe.to_excel(writer,sheet_name='Sheet1')
-        self.events_dataframe.to_excel(writer, sheet_name='Sheet2')
-
+        savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
+        if savefile_path:
+            with pd.ExcelWriter(savefile_path, engine='xlsxwriter') as writer:
+                savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
+                self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     
         
 

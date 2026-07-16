@@ -10,6 +10,7 @@ class Apnea:
         self.width = start_time + duration
         self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
         self.sub_apneas = subapnea if subapnea is not None else []
+        self.data = [self.name,self.start_time,self.duration,self.type,'N/A',self.sub_apneas]
     def add_subapnea(self,apnea):
         self.sub_apneas.append(apnea)
     def __str__(self): #information for use via print function
@@ -20,14 +21,22 @@ class Apnea:
         return self.start_time > apnea2.start_time or apnea2 in self.sub_apneas
     def __eq__(self,apnea2):
         return self.start_time == apnea2.start_time
+    def __getitem__(self, key):
+        self.data = [self.name,self.start_time,self.duration,self.type,'N/A',self.sub_apneas]
+        return self.data[key]
+    def __setitem__(self, index, value):
+        self.data = [self.name,self.start_time,self.duration,self.type,'N/A',self.sub_apneas]
+        self.data[index] = value
+
+
     
 class Sigh:
-    def __init__(self,start_time,duration,subapnea=None):
+    def __init__(self,start_time,duration,questionable=False,subapnea=None):
         self.name = "Sigh"
         self.duration = duration #duration of sigh based on width
         self.start_time = start_time #start of the sigh
         self.width = start_time + duration
-        self.questionable = False #whether the sigh could or couldnot potentially be a sniff
+        self.questionable = False if questionable is False else True #whether the sigh could or couldnot potentially be a sniff
         self.sub_apneas = subapnea if subapnea is not None else []
     def add_subapnea(self,apnea):
         self.sub_apneas.append(apnea)
@@ -40,6 +49,12 @@ class Sigh:
         return f"Start: {self.start_time}, Duration: {self.duration}"
     def __eq__(self,sigh2):
         return self.start_time == sigh2.start_time
+    def __getitem__(self, key):
+        self.data = [self.name,self.start_time,self.duration,'N/A',self.questionable,self.sub_apneas]
+        return self.data[key]
+    def __setitem__(self, index, value):
+        self.data = [self.name,self.start_time,self.duration,'N/A',self.questionable,self.sub_apneas]
+        self.data[index] = value
 
 def signaltonoise(a, apnea=None, axis=0, ddof=0):
     b = a.loc[(apnea.start_time < a['Time'])&(a['Time'] < apnea.width), ['Flow']] if apnea is not None else np.asanyarray(a['Flow'])
@@ -47,6 +62,53 @@ def signaltonoise(a, apnea=None, axis=0, ddof=0):
     m = b.mean(axis)
     sd = b.std(axis=axis, ddof=ddof)
     return np.where(sd == 0, 0, m/sd)
+
+def frametoapnea(dataframe):
+    apneas = []
+    for row in dataframe.itertuples(index=False):
+        if row.Event =='Apnea': 
+            new_apnea = Apnea(row.Type,float(row.Start),np.float64(row.Duration),subapnea=row.Subapneas)
+            apneas.append(new_apnea)
+    return apneas
+
+def frametosighs(dataframe):
+    sighs = []
+    for row in dataframe.itertuples(index=False):
+        if row.Event =='Sigh': 
+            new_sigh = Sigh(float(row.Start),np.float64(row.Duration),questionable=bool(row.Questionable == 'True'),subapnea=row.Subapneas)
+            sighs.append(new_sigh)
+    return sighs
+
+def eventstolist(dataframe):
+        names = []
+        starts = []
+        durations = []
+        types = []
+        question = []
+        subapneas = []
+        for row in dataframe.itertuples(index=False):
+            names.append(row.Event)
+            starts.append(row.Start)
+            durations.append(row.Duration)
+            types.append(row.Type)
+            question.append(row.Questionable)
+            subapneas.append(row.Subapneas)
+        return names, starts, durations, types, question, subapneas
+
+def removefromlists(event,start_list,*lists):
+    loc = start_list.index(event.start_time) if event.start_time in start_list else None
+    if loc:
+        for sublist in lists:
+            sublist.pop(loc)
+
+def editinlists(event,start_list,*lists):
+    loc = start_list.index(event.start_time) if event.start_time in start_list else None
+    start = 0
+    if loc:
+        for sublist in lists:
+            sublist[loc]=event[start]
+            start += 1
+
 
 def skiprows(iteration):
     skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
@@ -116,7 +178,7 @@ def postsigh_apnea(normalized_signal, sigh):
         while i < len(extended_peak_view) - 2: #While the index is less than the maximum
             if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999: 
                 #if the distance between the start of the next peak and the end of the first peak is greater than 0.7999, that means there's an apnea
-                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i],extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i]))
+                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i], extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i]))
                 #the apnea is defined as type 1 or 2, starting at the end of the first peak, and has a duration from the end of the last peak to the start of the next, placed in a list so more duration can be added if needed
                 sigh.add_subapnea(apnea)
                 apneas.append(apnea) #add the apnea to a list of apneas
@@ -125,7 +187,7 @@ def postsigh_apnea(normalized_signal, sigh):
         while i < len(extended_peaks) - 2:
             #same process but iterates from the sigh to 10 seconds after the sigh
             if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
-                apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i],extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i]))
+                apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i], extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i]))
                 sigh.add_subapnea(apnea)
                 apneas.append(apnea)
             i+=1
@@ -163,7 +225,7 @@ def apnea_combination(normalized_signal, apneas): #I need a way to clean this, g
                     removed_apneas.append(apnea2)
         else:
             for apnea2 in apneas: 
-                if apnea.start_time < apnea2.duration[0] < extended_view["Time"].iloc[0]:
+                if apnea.start_time < apnea2.duration < extended_view["Time"].iloc[0]:
                     apnea.add_subapnea(apnea2)
                     removed_apneas.append(apnea2)
 
