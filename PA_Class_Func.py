@@ -95,18 +95,18 @@ def eventstolist(dataframe):
             subapneas.append(row.Subapneas)
         return names, starts, durations, types, question, subapneas
 
-def removefromlists(event,start_list,*lists):
-    loc = start_list.index(event.start_time) if event.start_time in start_list else None
+def removefromlists(event,event_data):
+    loc = event_data['Start'].index(event.start_time) if event.start_time in event_data['Start'] else None
     if loc:
-        for sublist in lists:
-            sublist.pop(loc)
+        for sublist in event_data:
+            event_data[sublist].pop(loc)
 
-def editinlists(event,start_list,*lists):
-    loc = start_list.index(event.start_time) if event.start_time in start_list else None
+def editinlists(event,event_data):
+    loc = event_data['Start'].index(event.start_time) if event.start_time in event_data['Start'] else None
     start = 0
     if loc:
-        for sublist in lists:
-            sublist[loc]=event[start]
+        for sublist in event_data:
+            event_data[sublist][loc] = event[start]
             start += 1
 
 

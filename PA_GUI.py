@@ -294,14 +294,7 @@ class Analysis_Window:
 
         self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
         self.events_dataframe = pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
-        self.apneas = []
-        self.sighs = []
-        self.names = []
-        self.starts = []
-        self.durations = []
-        self.types = []
-        self.question = []
-        self.subapneas = []
+        self.event_data = {"Event": [], "Start": [], "Duration": [], "Type": [], "Questionable": [], "Subapneas": []}
 
         self.input_event = None
         self.event_loc = None
@@ -328,31 +321,26 @@ class Analysis_Window:
         self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.peaks, self.inverse = pa.peak_analysis(self.subsection_data,(self.skiprows*(1/2000)))
-        self.peaks_mean, self.peaks_area_mean = pa.peak_means(self.peaks)
-        self.sighs = pa.find_sighs(self.peaks,self.inverse,self.peaks_mean,self.peaks_area_mean)
-        for sigh in self.sighs or []:
-                self.apneas = pa.postsigh_apnea(self.main_data,sigh)
-        self.apneas = pa.type3_apnea(self.peaks, self.apneas)
-        self.apneas = pa.apnea_combination(self.main_data,self.apneas)
+        self.sighs = pa.find_sighs(self.subsection_data,self.skiprows)
+        new_sigh = self.sighs[-1] if self.subsection_data['Time'].iloc[0] < self.sighs[-1].start_time < self.subsection_data['Time'].iloc[-1] else None
+        self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
     def concatenate_data(self):
-        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.starts]
-        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.starts]
+        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.event_data['Start']]
+        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.event_data['Start']]
         for sigh in chunk_s:
-            self.names.append(sigh.name)
-            self.starts.append(sigh.start_time)
-            self.durations.append(sigh.duration)
-            self.types.append("N/A")
-            self.question.append(sigh.questionable)
-            self.subapneas.append(sigh.sub_apneas)
+            self.event_data['Event'].append(sigh.name)
+            self.event_data['Start'].append(sigh.start_time)
+            self.event_data['Duration'].append(sigh.duration)
+            self.event_data['Type'].append("N/A")
+            self.event_data['Questionable'].append(sigh.questionable)
+            self.event_data['Subapneas'].append(sigh.sub_apneas)
         for apnea in chunk_a:
-            self.names.append(apnea.name)
-            self.starts.append(apnea.start_time)
-            self.durations.append(apnea.duration)
-            self.types.append(apnea.type)
-            self.question.append("N/A")
-            self.subapneas.append(apnea.sub_apneas)
-        self.event_data = {"Event": self.names, "Start": self.starts, "Duration": self.durations, "Type": self.types, "Questionable": self.question, "Subapneas": self.subapneas}
+            self.event_data['Event'].append(apnea.name)
+            self.event_data['Start'].append(apnea.start_time)
+            self.event_data['Duration'].append(apnea.duration)
+            self.event_data['Type'].append(apnea.type)
+            self.event_data['Questionable'].append("N/A")
+            self.event_data['Subapneas'].append(apnea.sub_apneas)
         self.events_dataframe = pd.DataFrame(self.event_data)
     def display_events(self):
         self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=True)
@@ -362,8 +350,8 @@ class Analysis_Window:
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
         new_events = self.events_dataframe.tail(new).copy()
-        new_a = [pa.Apnea(row['Type'],row['Start'],row['Duration']) for _, row in new_events.iterrows() if row['Event'].upper()=='APNEA']
-        new_s = [pa.Sigh(row['Start'],row['Duration']) for _, row in new_events.iterrows() if row['Event'].upper()=='SIGH']
+        new_a = [pa.Apnea(row.Type,row.Start,row.Duration) for row in new_events.itertuples() if row.Event.upper()=='APNEA']
+        new_s = [pa.Sigh(row.Start,row.Duration) for row in new_events.itertuples() if row.Event.upper()=='SIGH']
         self.apneas.extend(new_a)
         self.sighs.extend(new_s)
     def get_event(self):
@@ -383,10 +371,8 @@ class Analysis_Window:
         key_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
         key_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time]
         if key_a:
-            pa.removefromlists(key_a[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
             self.apneas.pop(self.apneas.index(key_a[0]))
         if key_s:
-            pa.removefromlists(key_s[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
             self.sighs.pop(self.apneas.index(key_s[0]))
         self.events_dataframe.drop([self.event_loc])
         for key in self.event_data:
@@ -400,19 +386,19 @@ class Analysis_Window:
         old_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time]
         old_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
         if old_a:
-            pa.editinlists(old_a[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
-            self.event_data = {"Event": self.names, "Start": self.starts, "Duration": self.durations, "Type": self.types, "Questionable": self.question, "Subapneas": self.subapneas}
+            pa.editinlists(old_a[0], self.event_data)
             self.events_dataframe = pd.DataFrame(self.event_data) 
             inner_index = self.apneas.index(old_a[0]) 
             self.apneas.pop(inner_index)
             self.apneas.insert(inner_index)
         if old_s:
-            pa.editinlists(old_s[0], self.starts, self.durations, self.names, self.types, self.question, self.subapneas)
-            self.event_data = {"Event": self.names, "Start": self.starts, "Duration": self.durations, "Type": self.types, "Questionable": self.question, "Subapneas": self.subapneas}
+            pa.editinlists(old_s[0], self.event_data)
             self.events_dataframe = pd.DataFrame(self.event_data)
             inner_index = self.sighs.index(old_s[0]) 
             self.sighs.pop(inner_index)
             self.sighs.insert(inner_index)
+        self.event_loc = None
+        self.input_event = None
     def summon_graph(self):
         self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
@@ -441,6 +427,7 @@ class Analysis_Window:
         self.analyze_data()
         self.concatenate_data()
     def refresh(self):
+        self.fig.clear()
         self.display_events()
         self.summon_graph()
         self.controls.update_time(self)
@@ -507,7 +494,6 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
 
         self.controls = Controls(self)
 
-        self.names, self.starts, self.durations, self.types, self.question, self.subapneas = pa.eventstolist(self.events_dataframe)
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
     def acquire_savedata(self):
