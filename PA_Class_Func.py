@@ -125,13 +125,19 @@ def signal_prep(signal_name,skiprows):
     pleth_graph_ascii = signal_name #takes the ascii input data
     pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, low_memory=False, header=0, names=["Time","Flow"])
         #^ converts ascii data to pd.dataframe
-    normalized_signal = pleth_section.copy()
+    normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
     pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
     pleth_ten_section.plot(x="Time",y="Flow")
 
     return normalized_signal, pleth_ten_section
+
+def peak_means(peak_data):
+    ptsp_mean = peak_data['Height'].mean()
+    ptsp_area_mean = peak_data['Width'].mean() * peak_data['Height'].mean()
+
+    return ptsp_mean, ptsp_area_mean
 
 def peak_analysis(normalized_signal,skiprows):
     sampling_freq = 1/2000
@@ -146,16 +152,13 @@ def peak_analysis(normalized_signal,skiprows):
 
     ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
     ptsp_dataframe = pd.DataFrame(data=ptsp_data)
-    return ptsp_dataframe, pts_inversepeaks_loc
 
-def peak_means(peak_data):
-    ptsp_mean = peak_data['Height'].mean()
-    ptsp_area_mean = peak_data['Width'].mean() * peak_data['Height'].mean()
+    ptsp_mean, ptsp_area_mean = peak_means(ptsp_dataframe)
+    return ptsp_dataframe, pts_inversepeaks_loc, ptsp_mean, ptsp_area_mean
 
-    return ptsp_mean, ptsp_area_mean
-
-def find_sighs(peak_dataframe,inverse_data,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
+def find_sighs(normalized_signal,skiprows): #i could add the peak stuff in here to really condense it 
     sighs = []
+    peak_dataframe, inverse_data, peak_height_mean, peak_area_mean = peak_analysis(normalized_signal,skiprows)
     copy = peak_dataframe.copy()
     copy.sort_values(by=['Height'])
     row = copy.head(1).copy()
@@ -165,35 +168,26 @@ def find_sighs(peak_dataframe,inverse_data,peak_height_mean,peak_area_mean): #i 
                 sighs.append(new_sigh)
     return sighs
 
-def postsigh_apnea(normalized_signal, sigh):
-    #iterating through sighs
-    extended_view = normalized_signal.loc[(sigh.start_time < normalized_signal['Time']) & (normalized_signal['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
-    extended_peaks, extended_inverse = peak_analysis(extended_view, extended_view['Time'].iloc[0]) #gets the peaks of that ten second interval
-    extended_peak_hmean, extended_peak_amean = peak_means(extended_peaks)
-    next_sigh = find_sighs(extended_peaks,extended_inverse,extended_peak_hmean, extended_peak_amean) #if there's another sigh within ten seconds, catch it
-    i=0 #indexing value for while loops
-    apneas = [] #to acquire apneas
-    if len(next_sigh) > 0: #if there is a sigh
-        extended_peak_view = extended_peaks.loc[next_sigh[0].start_time > extended_peaks['Time']] #condense the extended peak view to end before the next sigh
-        while i < len(extended_peak_view) - 2: #While the index is less than the maximum
-            if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999: 
-                #if the distance between the start of the next peak and the end of the first peak is greater than 0.7999, that means there's an apnea
-                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i], extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i]))
-                #the apnea is defined as type 1 or 2, starting at the end of the first peak, and has a duration from the end of the last peak to the start of the next, placed in a list so more duration can be added if needed
-                sigh.add_subapnea(apnea)
-                apneas.append(apnea) #add the apnea to a list of apneas
-            i+=1 #move on to next peak
+def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None):
+    apneas = []
+    i=0
+    apneatype = "1/2" if sigh else "3"
+    if sigh: 
+        extended_view = normalized_signal.loc[(sigh.start_time < normalized_signal['Time']) & (normalized_signal['Time'] < sigh.start_time + 10), ['Time','Flow']]
     else:
-        while i < len(extended_peaks) - 2:
-            #same process but iterates from the sigh to 10 seconds after the sigh
-            if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
-                apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i], extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i]))
-                sigh.add_subapnea(apnea)
-                apneas.append(apnea)
-            i+=1
-    if len(apneas) < 1:
-        sigh.lack() #if there are no apneas after the sigh, the sigh may be a sniff, and needs to be highlighted differently
+        extended_view = normalized_subsection
+    next_sigh = find_sighs(extended_view,skiprows)
+    if len(next_sigh)>0: extended_view = extended_view.loc[extended_view['Time'] < next_sigh[0].start_time, ['Time','Flow']]
+    extended_peaks, _, _, _ = peak_analysis(extended_view)
+    while i < len(extended_peaks) - 2:
+        if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
+            apnea = Apnea(apneatype,start_time=extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i],duration=extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]))
+            if sigh: sigh.add_subapnea(apnea)
+            apneas.append(apnea)
+        i+=1
+    if sigh and len(apneas) < 1: sigh.lack()
     return apneas
+
 
 def matching_apnea(apnea,apneas):
     return any(
@@ -201,33 +195,15 @@ def matching_apnea(apnea,apneas):
         for apnea2 in apneas
     )
 
-def type3_apnea(peak_data, apneas):
-    i = 0
-    while i < len(peak_data) - 2:
-        if peak_data["Start"].iloc[i+1] - (peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i]) > 0.7999 and (not matching_apnea(peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i],apneas)): 
-             #if there's a gap in the peaks big enough for an apnea AND it's not an apnea already saved, it's a type 3
-             apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i]))
-             apneas.append(apnea)
-        i+=1
-    return apneas
-
-def apnea_combination(normalized_signal, apneas): #I need a way to clean this, good god
+def apnea_combination(normalized_signal,skiprows,apneas): #I need a way to clean this, good god
     removed_apneas = []
     for apnea in apneas:
-        extended_view, extended_inverse = peak_analysis(normalized_signal, apnea.start_time)
-        ev_hmean, ev_amean = peak_means(extended_view)
-        sigh_caught = find_sighs(extended_view,extended_inverse,ev_hmean,ev_amean)
-       
-        if len(sigh_caught) > 0:
-            for apnea2 in apneas: 
-                if apnea.start_time < apnea2.start_time < sigh_caught[0].start_time:
-                    apnea.add_subapnea(apnea2)
-                    removed_apneas.append(apnea2)
-        else:
-            for apnea2 in apneas: 
-                if apnea.start_time < apnea2.duration < extended_view["Time"].iloc[0]:
-                    apnea.add_subapnea(apnea2)
-                    removed_apneas.append(apnea2)
+        sigh_caught = find_sighs(normalized_signal,skiprows)
+        end = sigh_caught[0].start_time if len(sigh_caught) > 0 else normalized_signal['Time'].loc[(normalized_signal['Time'] < apnea.start_time + 10)]
+        for apnea2 in apneas: 
+            if apnea.start_time < apnea2.start_time < end['Time'].iloc[-1]:
+                apnea.add_subapnea(apnea2)
+                removed_apneas.append(apnea2)
 
     apneas = [apnea for apnea in apneas if apnea not in removed_apneas]
     return apneas

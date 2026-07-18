@@ -1,6 +1,7 @@
 from tkinter import *
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename, asksaveasfilename
+import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from pandastable import Table, TableModel
@@ -139,6 +140,9 @@ class Controls(Frame):
 
         edit = Button(self.window, text="Edit Event", command=main.edit_loc)
         edit.place(relx=0.42, rely=0.9)
+
+        # run_through = Button(self.window,text="Run Through",command=main.runthrough)
+        # run_through.place(relx=0.42,rely=0.95)
     def update_time(self, main):
         hour = iter//360 + 1
         minute = (iter - (hour-1)*360)//6
@@ -147,6 +151,7 @@ class Controls(Frame):
         main.hour_var.set(hour)
         main.minute_var.set(minute)
         main.second_var.set(second)
+
     def add_info(self,main):
         events = ['Sigh','Apnea','None']
         cb = ttk.Combobox(self.window, values=events)
@@ -214,7 +219,6 @@ class Controls(Frame):
         self.window.bind('<Escape>', escape)
         submit_button = Button(self.window, text="Submit", command=submit)
         submit_button.place(relx=0.7, rely=0.8)
-
     def edit_info(self,main):
         event_list = main.events_dataframe.values.tolist()
         cb = ttk.Combobox(self.window, values=event_list)
@@ -309,6 +313,8 @@ class Analysis_Window:
         self.controls = Controls(self)
 
         self.acquire_data()
+        self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
+        self.axes = self.fig.add_subplot()
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
@@ -408,23 +414,22 @@ class Analysis_Window:
             self.sighs.pop(inner_index)
             self.sighs.insert(inner_index)
     def summon_graph(self):
-        fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
-        axes = fig.add_subplot()
-        self.subsection_data.plot(x='Time',y='Flow',ax=axes,grid=True)
-        canvas = FigureCanvasTkAgg(fig, master=self.window)
-        canvas.draw()
+        self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
+        self.canvas.draw()
         chunk_s = (sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1])
         chunk_a = (apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1])
         for sigh in chunk_s:
-            axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
+            self.axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
         for apnea in chunk_a:
-            axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
-        toolbar = NavigationToolbar2Tk(canvas, self.window)
+            self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
+        toolbar = NavigationToolbar2Tk(self.canvas, self.window)
         toolbar.update()
         toolbar.place(relx=0.5,rely=0.6,anchor='c')
-        canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
+        self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
     def next_loop(self):
         update_iter()
+        self.fig.clear()
         self.acquire_data() #gets next ten seconds
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatenate_data()
@@ -449,14 +454,30 @@ class Analysis_Window:
             update_iter()
             self.next_process()
         self.refresh()
+    def runthrough(self):
+        self.save()
+        self.canvas.destroy()
+        plt.close(self.fig)
+        while iter < 1800:
+            update_iter()
+            self.next_process()
+            if iter%50==0:
+                self.updatesave()
+            self.controls.update_time(self)
     def save(self):
         savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
         savefile_dataframe = pd.DataFrame(data=savefile_data)
-        savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
-        if savefile_path:
-            with pd.ExcelWriter(savefile_path, engine='xlsxwriter') as writer:
+        self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
+        if self.savefile_path:
+            with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
                 savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
                 self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
+    def updatesave(self):
+        savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
+        savefile_dataframe = pd.DataFrame(data=savefile_data)
+        with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
+            savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
+            self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
 
 #I think I'll make a second analysis window type for loading data
 
@@ -501,11 +522,17 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
     def save(self):
         savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
         savefile_dataframe = pd.DataFrame(data=savefile_data)
-        savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
-        if savefile_path:
-            with pd.ExcelWriter(savefile_path, engine='xlsxwriter') as writer:
+        self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
+        if self.savefile_path:
+            with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
                 savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
                 self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
+    def updatesave(self):
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
+        savefile_dataframe = pd.DataFrame(data=savefile_data)
+        with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
+            savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
+            self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     
         
 
