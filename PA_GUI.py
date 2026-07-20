@@ -34,8 +34,8 @@ class PA_IntroWindow: #first window for taking the ascii file name
         self.window = frame #takes the universal Tk
         self.window.title("File Input") #names it after the section
 
-        message = "Welcome to the Plethysmography Analysis Alpha Build. To begin take the ascii data of the plethysmography you want to analyze, remove the headers via notepad, and paste the file path below. Or, if you have a savefile with the place" \
-        " you have so far, paste the file location of the savefile."
+        message = "Welcome to the Plethysmography Analysis Early Beta Build. To begin take the ascii data of the plethysmography you want to analyze, remove the headers via notepad, and open via file edxplorer or paste the file location. Or, if you have a savefile with the place" \
+        "you have so far, input the savefile."
         t = Text(self.window, width=30, height=10, wrap='word',font=('calibre',12,'normal'))
         t.insert('1.0',message)
         t.grid(row=0,column=0)
