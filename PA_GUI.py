@@ -4,12 +4,11 @@ from tkinter.filedialog import askopenfilename, asksaveasfilename
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
-from pandastable import Table, TableModel
+from pandastable import Table
 import pandas as pd
 import PA_Class_Func as pa
 import sys
 import traceback
-from pathlib import Path
     
 iter = 0
 
@@ -322,26 +321,14 @@ class Analysis_Window:
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
         self.sighs = pa.find_sighs(self.subsection_data,self.skiprows)
-        new_sigh = self.sighs[-1] if self.subsection_data['Time'].iloc[0] < self.sighs[-1].start_time < self.subsection_data['Time'].iloc[-1] else None
+        new_sigh = self.sighs[-1] if len(self.sighs) > 0 and self.subsection_data['Time'].iloc[0] < self.sighs[-1].start_time < self.subsection_data['Time'].iloc[-1] else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
     def concatenate_data(self):
-        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.event_data['Start']]
-        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.event_data['Start']]
-        for sigh in chunk_s:
-            self.event_data['Event'].append(sigh.name)
-            self.event_data['Start'].append(sigh.start_time)
-            self.event_data['Duration'].append(sigh.duration)
-            self.event_data['Type'].append("N/A")
-            self.event_data['Questionable'].append(sigh.questionable)
-            self.event_data['Subapneas'].append(sigh.sub_apneas)
-        for apnea in chunk_a:
-            self.event_data['Event'].append(apnea.name)
-            self.event_data['Start'].append(apnea.start_time)
-            self.event_data['Duration'].append(apnea.duration)
-            self.event_data['Type'].append(apnea.type)
-            self.event_data['Questionable'].append("N/A")
-            self.event_data['Subapneas'].append(apnea.sub_apneas)
-        self.events_dataframe = pd.DataFrame(self.event_data)
+        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.events_dataframe['Start']]
+        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.events_dataframe['Start']]
+        new_events = chunk_s + chunk_a
+        for event in new_events:
+            self.events_dataframe = pd.concat([self.events_dataframe,pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})],ignore_index=True)
     def display_events(self):
         self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=True)
         self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
@@ -369,24 +356,22 @@ class Analysis_Window:
         self.controls.del_info(self)
     def remove_event(self):
         key_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
-        key_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time]
+        key_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc] == apnea.start_time]
         if key_a:
             self.apneas.pop(self.apneas.index(key_a[0]))
         if key_s:
             self.sighs.pop(self.apneas.index(key_s[0]))
         self.events_dataframe.drop([self.event_loc])
-        for key in self.event_data:
-            self.event_data.get(key).pop(self.event_loc)
         self.event_loc = None
         self.display_events()
         self.refresh()
     def edit_loc(self):
         self.controls.edit_info(self)
     def edit_event(self):
-        old_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc]==apnea.start_time]
+        old_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc] == apnea.start_time]
         old_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
         if old_a:
-            pa.editinlists(old_a[0], self.event_data)
+            pa.editinlists(old_a[0], self.event_dataframe)
             self.events_dataframe = pd.DataFrame(self.event_data) 
             inner_index = self.apneas.index(old_a[0]) 
             self.apneas.pop(inner_index)
@@ -400,6 +385,7 @@ class Analysis_Window:
         self.event_loc = None
         self.input_event = None
     def summon_graph(self):
+        self.axes.clear()
         self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
         self.canvas.draw()
@@ -415,7 +401,6 @@ class Analysis_Window:
         self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
     def next_loop(self):
         update_iter()
-        self.fig.clear()
         self.acquire_data() #gets next ten seconds
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatenate_data()
@@ -427,7 +412,6 @@ class Analysis_Window:
         self.analyze_data()
         self.concatenate_data()
     def refresh(self):
-        self.fig.clear()
         self.display_events()
         self.summon_graph()
         self.controls.update_time(self)
@@ -526,6 +510,8 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
 window = Tk()
 IntroWindow = PA_IntroWindow(window)
 window.mainloop()
+if IntroWindow:
+    print('that window still exists dude')
 
 
 

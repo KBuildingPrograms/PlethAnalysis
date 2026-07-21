@@ -95,18 +95,14 @@ def eventstolist(dataframe):
             subapneas.append(row.Subapneas)
         return names, starts, durations, types, question, subapneas
 
-def removefromlists(event,event_data):
-    loc = event_data['Start'].index(event.start_time) if event.start_time in event_data['Start'] else None
-    if loc:
-        for sublist in event_data:
-            event_data[sublist].pop(loc)
+            
 
-def editinlists(event,event_data):
-    loc = event_data['Start'].index(event.start_time) if event.start_time in event_data['Start'] else None
+def editinlists(event,event_dataframe):
+    loc = (event_dataframe['Start'] == event.start_time).idxmax() if event.start_time in event_dataframe['Start'] else None
     start = 0
     if loc:
-        for sublist in event_data:
-            event_data[sublist][loc] = event[start]
+        for column in event_dataframe.iloc[loc]:
+            event_dataframe[column].iloc[loc] = event[start]
             start += 1
 
 
@@ -143,12 +139,12 @@ def peak_analysis(normalized_signal,skiprows):
     sampling_freq = 1/2000
     pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=normalized_signal['Flow'].std())
     pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-0.8)*normalized_signal['Flow'].std())
-    pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows
-    pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows
+    pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows*sampling_freq
+    pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows*sampling_freq
     pts_peaks_w =scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
     pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
     pts_peaks_width = pts_peaks_w[0]*sampling_freq
-    pts_peaks_start = pts_peaks_w[2]*sampling_freq + skiprows
+    pts_peaks_start = pts_peaks_w[2]*sampling_freq + skiprows*sampling_freq
 
     ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
     ptsp_dataframe = pd.DataFrame(data=ptsp_data)
@@ -178,7 +174,7 @@ def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None):
         extended_view = normalized_subsection
     next_sigh = find_sighs(extended_view,skiprows)
     if len(next_sigh)>0: extended_view = extended_view.loc[extended_view['Time'] < next_sigh[0].start_time, ['Time','Flow']]
-    extended_peaks, _, _, _ = peak_analysis(extended_view)
+    extended_peaks, _, _, _ = peak_analysis(extended_view, skiprows)
     while i < len(extended_peaks) - 2:
         if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
             apnea = Apnea(apneatype,start_time=extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i],duration=extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]))
