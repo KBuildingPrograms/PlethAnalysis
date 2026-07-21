@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from pandastable import Table
-import pandas as pd
 import PA_Class_Func as pa
 import sys
 import traceback
@@ -292,7 +291,7 @@ class Analysis_Window:
         self.filename = self.file_var.get()
 
         self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
-        self.events_dataframe = pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
+        self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
         self.event_data = {"Event": [], "Start": [], "Duration": [], "Type": [], "Questionable": [], "Subapneas": []}
 
         self.input_event = None
@@ -328,7 +327,7 @@ class Analysis_Window:
         chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.events_dataframe['Start']]
         new_events = chunk_s + chunk_a
         for event in new_events:
-            self.events_dataframe = pd.concat([self.events_dataframe,pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})],ignore_index=True)
+            self.events_dataframe = pa.pd.concat([self.events_dataframe,pa.pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})],ignore_index=True)
     def display_events(self):
         self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=True)
         self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
@@ -372,13 +371,11 @@ class Analysis_Window:
         old_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
         if old_a:
             pa.editinlists(old_a[0], self.event_dataframe)
-            self.events_dataframe = pd.DataFrame(self.event_data) 
             inner_index = self.apneas.index(old_a[0]) 
             self.apneas.pop(inner_index)
             self.apneas.insert(inner_index)
         if old_s:
-            pa.editinlists(old_s[0], self.event_data)
-            self.events_dataframe = pd.DataFrame(self.event_data)
+            pa.editinlists(old_s[0], self.event_dataframe)
             inner_index = self.sighs.index(old_s[0]) 
             self.sighs.pop(inner_index)
             self.sighs.insert(inner_index)
@@ -437,16 +434,16 @@ class Analysis_Window:
             self.controls.update_time(self)
     def save(self):
         savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
-        savefile_dataframe = pd.DataFrame(data=savefile_data)
+        savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
         if self.savefile_path:
-            with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
+            with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
                 savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
                 self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     def updatesave(self):
         savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
-        savefile_dataframe = pd.DataFrame(data=savefile_data)
-        with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
+        savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
+        with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
             savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
             self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
 
@@ -482,8 +479,8 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.summon_graph()
     def acquire_savedata(self):
         global iter
-        save_data = pd.read_excel(self.file_var.get(),sheet_name=0)
-        self.events_dataframe = pd.read_excel(self.file_var.get(),sheet_name=1)
+        save_data = pa.pd.read_excel(self.file_var.get(),sheet_name=0)
+        self.events_dataframe = pa.pd.read_excel(self.file_var.get(),sheet_name=1)
         self.filename = save_data['Filename'].iloc[0]
         iter = save_data["Current Iteration"].iloc[0]
         self.events_data = self.events_dataframe.to_dict("list")
@@ -491,16 +488,16 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
     def save(self):
         savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
-        savefile_dataframe = pd.DataFrame(data=savefile_data)
+        savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
         if self.savefile_path:
-            with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
+            with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
                 savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
                 self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     def updatesave(self):
         savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
-        savefile_dataframe = pd.DataFrame(data=savefile_data)
-        with pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
+        savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
+        with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
             savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
             self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     

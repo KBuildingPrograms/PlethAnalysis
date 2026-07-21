@@ -119,7 +119,7 @@ def signal_prep(signal_name,skiprows):
     signal_name = signal_name.replace("\"","") #removes the windows quotations from copying 
     signal_name = signal_name.replace("\n","")
     pleth_graph_ascii = signal_name #takes the ascii input data
-    pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, low_memory=False, header=0, names=["Time","Flow"])
+    pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"])
         #^ converts ascii data to pd.dataframe
     normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
