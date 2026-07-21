@@ -1,14 +1,17 @@
 from scipy import signal as scp
 import pandas as pd
 import numpy as np
+cimport numpy as np
 
 class Apnea:
-    def __init__(self,type,start_time,duration,subapnea=None):
+    def __init__(self,a_type,start_time,duration,subapnea=None):
+        cdef char self.name, self.type
+        cdef double self.duration, self.start_time, self.width
         self.name = "Apnea"
         self.duration = duration #list of durations for the apneas
         self.start_time = start_time #the start of the first major apnea
         self.width = start_time + duration
-        self.type = type #the type of the apnea (sighless type 3 or postsigh type 1/2)
+        self.type = a_type #the type of the apnea (sighless type 3 or postsigh type 1/2)
         self.sub_apneas = subapnea if subapnea is not None else []
         self.data = [self.name,self.start_time,self.duration,self.type,'N/A',self.sub_apneas]
     def add_subapnea(self,apnea):
@@ -32,6 +35,9 @@ class Apnea:
     
 class Sigh:
     def __init__(self,start_time,duration,questionable=False,subapnea=None):
+        cdef char self.name
+        cdef double self.duration, self.start_time, self.width
+        cdef bool self.questionable
         self.name = "Sigh"
         self.duration = duration #duration of sigh based on width
         self.start_time = start_time #start of the sigh
@@ -75,7 +81,7 @@ def frametosighs(dataframe):
     sighs = []
     for row in dataframe.itertuples(index=False):
         if row.Event =='Sigh': 
-            new_sigh = Sigh(float(row.Start),np.float32(row.Duration),questionable=bool(row.Questionable == 'True'),subapnea=row.Subapneas)
+            new_sigh = Sigh(float(row.Start),np.float64(row.Duration),questionable=bool(row.Questionable == 'True'),subapnea=row.Subapneas)
             sighs.append(new_sigh)
     return sighs
 
@@ -98,6 +104,7 @@ def eventstolist(dataframe):
             
 
 def editinlists(event,event_dataframe):
+    cdef int loc, start
     loc = (event_dataframe['Start'] == event.start_time).idxmax() if event.start_time in event_dataframe['Start'] else None
     start = 0
     if loc:
@@ -106,11 +113,13 @@ def editinlists(event,event_dataframe):
             start += 1
 
 
-def skiprows(iteration):
+cpdef int skiprows(iteration):
+    cdef int skiprows
     skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
     return skiprows
 
 def signal_prep(signal_name,skiprows):
+    cdef int chunk_value, sampling_interval, Nrows
     chunk_value = 20 #block of time to take
     sampling_interval = 2000 #sampling freq
     Nrows = chunk_value * sampling_interval #total number of rows
@@ -135,6 +144,8 @@ def peak_means(peak_data):
     return ptsp_mean, ptsp_area_mean
 
 def peak_analysis(normalized_signal,skiprows):
+    cdef int skiprows
+    cdef double sampling_freq
     sampling_freq = 1/2000
     pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=normalized_signal['Flow'].std())
     pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-0.8)*normalized_signal['Flow'].std())
@@ -151,19 +162,25 @@ def peak_analysis(normalized_signal,skiprows):
     ptsp_mean, ptsp_area_mean = peak_means(ptsp_dataframe)
     return ptsp_dataframe, pts_inversepeaks_loc, ptsp_mean, ptsp_area_mean
 
-def find_sighs(normalized_signal,skiprows): #i could add the peak stuff in here to really condense it 
+def find_sighs(normalized_signal,skiprows): #i could add the peak stuff in here to really condense it
+    cdef int skiprows
+    cdef double height_margin, width_margin
+    height_margin = 1.25
+    width_margin = 0.8
     sighs = []
     peak_dataframe, inverse_data, peak_height_mean, peak_area_mean = peak_analysis(normalized_signal,skiprows)
     copy = peak_dataframe.copy()
     copy.sort_values(by=['Height'])
     row = copy.head(1).copy()
     inverse = [x for x in inverse_data if x > row['Start'].iloc[0]+row['Width'].iloc[0]]
-    if row['Height'].iloc[0] > 1.25*peak_height_mean and row['Width'].iloc[0] > 0.8*peak_area_mean and inverse is not None:
+    if row['Height'].iloc[0] > height_margin*peak_height_mean and row['Width'].iloc[0] > width_margin*peak_area_mean and inverse is not None:
                 new_sigh = Sigh(row['Start'],row['Width'])
                 sighs.append(new_sigh)
     return sighs
 
 def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None):
+    cdef int skiprows, I
+    cdef char apneatype
     apneas = []
     i=0
     apneatype = "1/2" if sigh else "3"
