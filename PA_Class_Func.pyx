@@ -1,5 +1,6 @@
 from scipy import signal as scp
 import pandas as pd
+import polars as pl
 import numpy as np
 cimport numpy as np
 
@@ -84,23 +85,6 @@ def frametosighs(dataframe):
             new_sigh = Sigh(float(row.Start),np.float64(row.Duration),questionable=bool(row.Questionable == 'True'),subapnea=row.Subapneas)
             sighs.append(new_sigh)
     return sighs
-
-def eventstolist(dataframe):
-        names = []
-        starts = []
-        durations = []
-        types = []
-        question = []
-        subapneas = []
-        for row in dataframe.itertuples(index=False):
-            names.append(row.Event)
-            starts.append(row.Start)
-            durations.append(row.Duration)
-            types.append(row.Type)
-            question.append(row.Questionable)
-            subapneas.append(row.Subapneas)
-        return names, starts, durations, types, question, subapneas
-
             
 
 def editinlists(event,event_dataframe):
@@ -114,9 +98,21 @@ def editinlists(event,event_dataframe):
 
 
 cpdef int skiprows(iteration):
-    cdef int skiprows
+    cdef int skiprows, iteration
     skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
     return skiprows
+
+def signal_hour(signal_name,hour):
+    cdef int sampling_interval, Nrows, total_seconds, skiprows
+    dtypes = {'Time':pl.float32,'Flo':pl.float32}
+    total_seconds = 3600
+    sampling_interval = 2000
+    Nrows = 2000*3600
+    skiprows = 2000*(3600 + 3600*(hour-1))
+    signal_name = signal_name.replace("\"","") #removes the windows quotations from copying 
+    signal_name = signal_name.replace("\n","")
+    hour_chunk = pl.read_csv(signal_name,has_header=False,skip_rows=skiprows,n_rows=Nrows,dtypes=dtypes)
+
 
 def signal_prep(signal_name,skiprows):
     cdef int chunk_value, sampling_interval, Nrows
@@ -127,8 +123,9 @@ def signal_prep(signal_name,skiprows):
         raise TypeError("Signal name must be string") #guard against weird pass
     signal_name = signal_name.replace("\"","") #removes the windows quotations from copying 
     signal_name = signal_name.replace("\n","")
-    pleth_graph_ascii = signal_name #takes the ascii input data
-    pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"])
+    #pleth_section = pl.scan_parquet(signal_name,n_rows=Nrows + skiprows)
+    #pleth_pandas = pleth_section.slice(skiprows, Nrows).to_pandas
+    pleth_section = pd.read_csv(signal_name, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"],engine='pyarrow')
         #^ converts ascii data to pd.dataframe
     normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
@@ -166,7 +163,7 @@ def find_sighs(normalized_signal,skiprows): #i could add the peak stuff in here 
     cdef int skiprows
     cdef double height_margin, width_margin
     height_margin = 1.25
-    width_margin = 0.8
+    width_margin = 0.7
     sighs = []
     peak_dataframe, inverse_data, peak_height_mean, peak_area_mean = peak_analysis(normalized_signal,skiprows)
     copy = peak_dataframe.copy()

@@ -8,8 +8,10 @@ from pandastable import Table
 import PA_Class_Func as pa
 import sys
 import traceback
+import pyinstrument
     
 iter = 0
+
 
 def escape():
     return True
@@ -315,9 +317,13 @@ class Analysis_Window:
         self.window = Toplevel(master=frame)
         self.window.title("AnalysisWindow")
         self.window.state('zoomed')
+    
+    @pyinstrument.profile()
     def acquire_data(self):
         self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
+
+    @pyinstrument.profile()
     def analyze_data(self):
         self.sighs = pa.find_sighs(self.subsection_data,self.skiprows)
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and self.subsection_data['Time'].iloc[0] < self.sighs[-1].start_time < self.subsection_data['Time'].iloc[-1] else None
@@ -477,6 +483,8 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
 
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
+
+
     def acquire_savedata(self):
         global iter
         save_data = pa.pd.read_excel(self.file_var.get(),sheet_name=0)
@@ -506,9 +514,9 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         
 window = Tk()
 IntroWindow = PA_IntroWindow(window)
+
 window.mainloop()
-if IntroWindow:
-    print('that window still exists dude')
+
 
 
 
