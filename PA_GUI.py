@@ -71,7 +71,7 @@ class PA_IntroWindow: #first window for taking the ascii file name
         print(fn)
         if ".xlsx" in fn:
             self.savefile_var = StringVar(value=fn)
-        elif ".ascii" in fn:
+        elif ".ascii" or ".parquet" in fn:
             self.file_var = StringVar(value=fn)
         else:
             pass
@@ -321,6 +321,9 @@ class Analysis_Window:
     @pyinstrument.profile()
     def acquire_data(self):
         self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
+        data_check = pa.signal_prep(self.filename, self.skiprows)
+        print(data_check)
+        print("yo mama")
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
 
     @pyinstrument.profile()

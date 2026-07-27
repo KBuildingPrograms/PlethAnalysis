@@ -123,11 +123,12 @@ def signal_prep(signal_name,skiprows):
         raise TypeError("Signal name must be string") #guard against weird pass
     signal_name = signal_name.replace("\"","") #removes the windows quotations from copying 
     signal_name = signal_name.replace("\n","")
-    #pleth_section = pl.scan_parquet(signal_name,n_rows=Nrows + skiprows)
-    #pleth_pandas = pleth_section.slice(skiprows, Nrows).to_pandas
-    pleth_section = pd.read_csv(signal_name, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"],engine='pyarrow')
+    pleth_section = pl.read_parquet(signal_name,columns=["Time","Flow"],n_rows=Nrows+skiprows)
+    return pleth_section 
+    pleth_pandas = pleth_section.slice(skiprows, Nrows).to_pandas()
+    #pleth_section = pd.read_csv(signal_name, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"],engine='pyarrow')
         #^ converts ascii data to pd.dataframe
-    normalized_signal = pleth_section.copy().astype('float32')
+    normalized_signal = pleth_pandas.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
     pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
