@@ -5,28 +5,9 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from pandastable import Table
-import PA_Class_Func as pa
 import sys
 import traceback
-    
-iter = 0
-
-def escape():
-    return True
-
-
-def reset():
-    global iter
-    iter = 0
-
-def update_iter():
-    global iter
-    iter += 1
-
-def jump(hour,minute,second):
-    global iter
-    time = int(((hour*3600 - 3600) + (minute*60) + second)/10)
-    iter = time
+import PA_Class_Func as pa
 
 class PA_IntroWindow: #first window for taking the ascii file name
     def __init__(self,frame):
@@ -58,19 +39,18 @@ class PA_IntroWindow: #first window for taking the ascii file name
         self.open_explorer.grid(row=3,column=0)
     def summon_window(self): #summons the next window
         try:
-            if self.file_var.get():
-                new = Analysis_Window(self.file_var) #initiates the next window
-            elif self.savefile_var.get():
-                new = Analysis_Savefile(self.savefile_var)
+            if self.file:
+                new = Analysis_Window(self.file) #initiates the next window
+            elif self.savefile:
+                new = Analysis_Savefile(self.savefile)
         except Exception as e:
             print(e)
     def file_selection(self):
         fn =  askopenfilename()
-        print(fn)
         if ".xlsx" in fn:
-            self.savefile_var = StringVar(value=fn)
-        elif ".ascii" in fn:
-            self.file_var = StringVar(value=fn)
+            self.savefile = fn
+        elif ".ascii" or ".parquet" in fn:
+            self.file = fn
         else:
             pass
         self.summon_window()
@@ -85,7 +65,8 @@ class PA_IntroWindow: #first window for taking the ascii file name
 
             file_acq = Label(self.window,text='File Acquired!',font=('calibre',15,'bold')) #alerts the user that the file name was functional
             file_acq.grid(row=3,column=0)
-            
+            self.savefile = self.savefile_var.get() if self.savefile_var.get() else None
+            self.file = self.file_var.get() if self.file_var.get() else None
             self.summon_window() #if so, go to next window
         except Exception as e:
             _, _, exc_tb = sys.exc_info()
@@ -142,9 +123,9 @@ class Controls(Frame):
         # run_through = Button(self.window,text="Run Through",command=main.runthrough)
         # run_through.place(relx=0.42,rely=0.95)
     def update_time(self, main):
-        hour = iter//360 + 1
-        minute = (iter - (hour-1)*360)//6
-        second = (iter - (hour-1)*360 - (minute*6))*10
+        hour = main.iter//360 + 1
+        minute = (main.iter - (hour-1)*360)//6
+        second = (main.iter - (hour-1)*360 - (minute*6))*10
 
         main.hour_var.set(hour)
         main.minute_var.set(minute)
@@ -286,9 +267,9 @@ class Analysis_Window:
         self.new_window(window) #makes a new window based off of the master Tk window
         self.width = self.window.winfo_width() #takes the width 
         self.height = self.window.winfo_height() #and height of the current window for future reference
-        self.skiprows = pa.skiprows(iter)
-        self.file_var = filename
-        self.filename = self.file_var.get()
+        self.iter = 0
+        self.skiprows = pa.skiprows(self.iter)
+        self.filename = filename
 
         self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
@@ -316,8 +297,8 @@ class Analysis_Window:
         self.window.title("AnalysisWindow")
         self.window.state('zoomed')
     def acquire_data(self):
-        self.skiprows = pa.skiprows(iter) #take the rows that are needed to skip based on the iteration at the time
-        self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
+        self.skiprows = pa.skiprows(self.iter) #take the rows that are needed to skip based on the iteration at the time
+        self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
         self.sighs = pa.find_sighs(self.subsection_data,self.skiprows)
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and self.subsection_data['Time'].iloc[0] < self.sighs[-1].start_time < self.subsection_data['Time'].iloc[-1] else None
@@ -396,8 +377,17 @@ class Analysis_Window:
         toolbar.update()
         toolbar.place(relx=0.5,rely=0.6,anchor='c')
         self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
+    def reset(self):
+        self.iter = 0 
+    def update_iter(self):
+        self.iter += 1
+    def jump(self):
+        hour = self.hour_var.get()
+        minute = self.minute_var.get()
+        second = self.second_var.get()
+        self.iter = int(((hour*3600 - 3600) + (minute*60) + second)/10)
     def next_loop(self):
-        update_iter()
+        self.update_iter()
         self.acquire_data() #gets next ten seconds
         self.analyze_data() #sends the 10 second interval through standard analysis
         self.concatenate_data()
@@ -413,13 +403,13 @@ class Analysis_Window:
         self.summon_graph()
         self.controls.update_time(self)
     def jumpto(self):
-        jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
+        self.jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
         self.concatenate_data()
         self.refresh()
     def runtill(self):
         current = len(self.events_dataframe)
         while len(self.events_dataframe) < current + 1:
-            update_iter()
+            self.update_iter()
             self.next_process()
         self.refresh()
     def runthrough(self):
@@ -427,7 +417,7 @@ class Analysis_Window:
         self.canvas.destroy()
         plt.close(self.fig)
         while iter < 1800:
-            update_iter()
+            self.update_iter()
             self.next_process()
             if iter%50==0:
                 self.updatesave()
@@ -478,16 +468,15 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
     def acquire_savedata(self):
-        global iter
         save_data = pa.pd.read_excel(self.file_var.get(),sheet_name=0)
         self.events_dataframe = pa.pd.read_excel(self.file_var.get(),sheet_name=1)
         self.filename = save_data['Filename'].iloc[0]
-        iter = save_data["Current Iteration"].iloc[0]
+        self.iter = save_data["Current Iteration"].iloc[0]
         self.events_data = self.events_dataframe.to_dict("list")
-        self.skiprows = pa.skiprows(iter)
+        self.skiprows = pa.skiprows(self.iter)
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
     def save(self):
-        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [self.iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
         if self.savefile_path:
@@ -495,7 +484,7 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
                 savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
                 self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     def updatesave(self):
-        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [self.iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
             savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)

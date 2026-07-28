@@ -1,4 +1,5 @@
 from scipy import signal as scp
+import polars as pl
 import pandas as pd
 import numpy as np
 
@@ -119,14 +120,18 @@ def signal_prep(signal_name,skiprows):
     signal_name = signal_name.replace("\"","") #removes the windows quotations from copying 
     signal_name = signal_name.replace("\n","")
     pleth_graph_ascii = signal_name #takes the ascii input data
-    pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"])
+    if ".parquet" in signal_name:
+        total_pleth = pl.read_parquet(signal_name,columns=["Time","Flow"])
+        pleth_section = total_pleth.slice(skiprows,Nrows).to_pandas()
+    if ".ascii" in signal_name:
+        total_pleth = None
+        pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"])
         #^ converts ascii data to pd.dataframe
     normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
     pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
-
-    return normalized_signal, pleth_ten_section
+    return total_pleth, normalized_signal, pleth_ten_section
 
 def peak_means(peak_data):
     ptsp_mean = peak_data['Height'].mean()
