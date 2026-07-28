@@ -273,7 +273,6 @@ class Analysis_Window:
 
         self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
-        self.event_data = {"Event": [], "Start": [], "Duration": [], "Type": [], "Questionable": [], "Subapneas": []}
 
         self.input_event = None
         self.event_loc = None
@@ -351,12 +350,12 @@ class Analysis_Window:
         old_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc] == apnea.start_time]
         old_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
         if old_a:
-            pa.editinlists(old_a[0], self.event_dataframe)
+            pa.editinlists(old_a[0], self.events_dataframe)
             inner_index = self.apneas.index(old_a[0]) 
             self.apneas.pop(inner_index)
             self.apneas.insert(inner_index)
         if old_s:
-            pa.editinlists(old_s[0], self.event_dataframe)
+            pa.editinlists(old_s[0], self.events_dataframe)
             inner_index = self.sighs.index(old_s[0]) 
             self.sighs.pop(inner_index)
             self.sighs.insert(inner_index)
@@ -472,7 +471,6 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.events_dataframe = pa.pd.read_excel(self.file_var.get(),sheet_name=1)
         self.filename = save_data['Filename'].iloc[0]
         self.iter = save_data["Current Iteration"].iloc[0]
-        self.events_data = self.events_dataframe.to_dict("list")
         self.skiprows = pa.skiprows(self.iter)
         self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
     def save(self):
