@@ -82,9 +82,9 @@ class Controls(Frame):
         self.window = main.window
         control = main
 
-        hour = iter//360 + 1
-        minute = (iter - (hour-1)*360)//6
-        second = (iter - (hour-1)*360 - (minute*6))*10
+        hour = main.iter//360 + 1
+        minute = (main.iter - (hour-1)*360)//6
+        second = (main.iter - (hour-1)*360 - (minute*6))*10
 
         main.hour_var = IntVar(main.window, hour)
         main.minute_var = IntVar(main.window, minute)
@@ -120,8 +120,10 @@ class Controls(Frame):
         edit = Button(self.window, text="Edit Event", command=main.edit_loc)
         edit.place(relx=0.42, rely=0.9)
 
-        # run_through = Button(self.window,text="Run Through",command=main.runthrough)
-        # run_through.place(relx=0.42,rely=0.95)
+        if main.total is not None:
+            run_through = Button(self.window,text="Run Through",command=main.runthrough)
+            run_through.place(relx=0.42,rely=0.95)
+
     def update_time(self, main):
         hour = main.iter//360 + 1
         minute = (main.iter - (hour-1)*360)//6
@@ -274,6 +276,7 @@ class Analysis_Window:
         self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
 
+        self.total = None
         self.input_event = None
         self.event_loc = None
 
@@ -281,9 +284,10 @@ class Analysis_Window:
         self.minute_var = IntVar()
         self.second_var = IntVar()
 
-        self.controls = Controls(self)
+        
 
         self.acquire_data()
+        self.controls = Controls(self)
         self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
         self.axes = self.fig.add_subplot()
         self.analyze_data() #sends the 10 second interval through standard analysis
@@ -298,10 +302,13 @@ class Analysis_Window:
     def acquire_data(self):
         self.skiprows = pa.skiprows(self.iter) #take the rows that are needed to skip based on the iteration at the time
         self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
+        if self.total is not None:
+            self.peak_ref = pa.total_deviation(self.total)
     def analyze_data(self):
-        self.sighs = pa.find_sighs(self.subsection_data,self.skiprows)
-        new_sigh = self.sighs[-1] if len(self.sighs) > 0 and self.subsection_data['Time'].iloc[0] < self.sighs[-1].start_time < self.subsection_data['Time'].iloc[-1] else None
+        self.sighs = pa.find_sighs(self.subsection_data,self.skiprows) 
+        new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
+        self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
         chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.events_dataframe['Start']]
         chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.events_dataframe['Start']]
@@ -370,8 +377,12 @@ class Analysis_Window:
         chunk_a = (apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1])
         for sigh in chunk_s:
             self.axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
+            for apnea in sigh.sub_apneas:
+                self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='cyan')
         for apnea in chunk_a:
             self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
+            for subapnea in apnea.sub_apneas:
+                self.axes.axvspan(subapnea.start_time, subapnea.width, alpha=0.3, color='cyan')
         toolbar = NavigationToolbar2Tk(self.canvas, self.window)
         toolbar.update()
         toolbar.place(relx=0.5,rely=0.6,anchor='c')
@@ -413,16 +424,12 @@ class Analysis_Window:
         self.refresh()
     def runthrough(self):
         self.save()
-        self.canvas.destroy()
-        plt.close(self.fig)
-        while iter < 1800:
-            self.update_iter()
-            self.next_process()
-            if iter%50==0:
-                self.updatesave()
-            self.controls.update_time(self)
+        if self.savefile_path:
+            plt.close(self.fig)
+            pa.large_data_process(self.total,self.iter)
+            self.updatesave()
     def save(self):
-        savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
         if self.savefile_path:
@@ -430,7 +437,8 @@ class Analysis_Window:
                 savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
                 self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     def updatesave(self):
-        savefile_data = {"Filename": [self.file_var.get()], "Current Iteration": [iter]}
+        print("Updated savefile!")
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
             savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
@@ -494,8 +502,7 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
 window = Tk()
 IntroWindow = PA_IntroWindow(window)
 window.mainloop()
-if IntroWindow:
-    print('that window still exists dude')
+
 
 
 
