@@ -49,7 +49,7 @@ class PA_IntroWindow: #first window for taking the ascii file name
         fn =  askopenfilename()
         if ".xlsx" in fn:
             self.savefile = fn
-        elif ".ascii" or ".parquet" in fn:
+        elif ".ascii" or ".parquet"in fn:
             self.file = fn
         else:
             pass
@@ -301,9 +301,10 @@ class Analysis_Window:
         self.window.state('zoomed')
     def acquire_data(self):
         self.skiprows = pa.skiprows(self.iter) #take the rows that are needed to skip based on the iteration at the time
-        self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
         if self.total is not None:
-            self.peak_ref = pa.total_deviation(self.total)
+            self.main_data, self.subsection_data = pa.quick_prep(self.total,self.skiprows)
+        else:
+            self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
         self.sighs = pa.find_sighs(self.subsection_data,self.skiprows) 
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
@@ -443,11 +444,6 @@ class Analysis_Window:
         with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
             savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)
             self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
-
-#I think I'll make a second analysis window type for loading data
-
-
-
 
 
 

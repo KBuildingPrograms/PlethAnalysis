@@ -124,6 +124,17 @@ def signal_prep(signal_name,skiprows):
     pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
     return total_pleth, normalized_signal, pleth_ten_section
 
+def quick_prep(total_pleth,skiprows):
+    chunk_value = 20 #block of time to take
+    sampling_interval = 2000 #sampling freq
+    Nrows = chunk_value * sampling_interval #total number of rows
+    pleth_section = total_pleth.slice(skiprows,Nrows).to_pandas()
+    normalized_signal = pleth_section.copy().astype('float32')
+    normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
+
+    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
+    return normalized_signal, pleth_ten_section
+
 def total_deviation(total_data):
     total_data_peakref = total_data["Flow"].std()
     return total_data_peakref
