@@ -304,11 +304,11 @@ class Analysis_Window:
         self.sighs = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref) 
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
-        self.apneas = pa.apnea_detection(self.main_data,self.main_data.iloc[8*2000:12*2000],self.skiprows,sigh=new_sigh)
+        self.apneas = pa.apnea_detection(self.main_data,self.main_data.iloc[7*2000:13*2000],self.skiprows,sigh=new_sigh)
         self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
-        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and not pa.np.isclose(self.events_dataframe['Start'],sigh.start_time,atol=1e-5).any()]
-        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and not pa.np.isclose(self.events_dataframe['Start'],apnea.start_time,atol=1e-5).any()]
+        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.main_data['Time'].iloc[13*2000] and not pa.np.isclose(self.events_dataframe['Start'],sigh.start_time,atol=1e-5).any()]
+        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.main_data['Time'].iloc[13*2000] and not pa.np.isclose(self.events_dataframe['Start'],apnea.start_time,atol=1e-5).any()]
         new_events = chunk_s + chunk_a
         for event in new_events:
             self.events_dataframe = pa.pd.concat([self.events_dataframe,pa.pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})],ignore_index=True)
@@ -410,7 +410,7 @@ class Analysis_Window:
         self.summon_graph()
         self.controls.update_time(self)
     def jumpto(self):
-        self.jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
+        self.jump()
         self.concatenate_data()
         self.refresh()
     def runtill(self):
