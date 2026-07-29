@@ -150,7 +150,7 @@ def peak_means(peak_data):
 def peak_analysis(normalized_signal,skiprows,height_ref=None):
     sampling_freq = 1/2000
     height = normalized_signal['Flow'].std() if height_ref==None else height_ref
-    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=height*1.05)
+    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=height*1.1)
     pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-1.6)*height)
     pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows*sampling_freq
     pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows*sampling_freq
@@ -172,7 +172,7 @@ def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the pea
     copy = peak_dataframe.copy(deep=False)
     copy = copy.sort_values(by=['Height'],ascending=False)
     row = copy.head(1).copy()
-    inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.3 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
+    inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
     if row['Height'].iloc[0] > 1.25*peak_height_mean and row['Width'].iloc[0] > 0.7*peak_area_mean and inverse is not None:
                 new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
                 sighs.append(new_sigh)

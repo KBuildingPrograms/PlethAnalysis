@@ -96,7 +96,7 @@ class Controls(Frame):
         M_entry.place(relx=0.7, rely=0.6)
         S_entry = Entry(self.window, textvariable=main.second_var, font=('calibre',12,'normal'))
         S_entry.place(relx=0.8, rely=0.6)
-        jump = Button(self.window, text='Jump',command=control.jumpto)
+        jump = Button(self.window, text='Jump',command=lambda : main.jump(main.hour_var.get(),main.minute_var.get(),main.second_var.get()))
         jump.place(relx = 0.8, rely=0.65)
 
         next = Button(self.window, text="Next 10 Seconds", command=control.next_loop)
@@ -273,9 +273,9 @@ class Analysis_Window:
         self.input_event = None
         self.event_loc = None
 
-        self.hour_var = IntVar()
-        self.minute_var = IntVar()
-        self.second_var = IntVar()
+        self.hour_var = None
+        self.minute_var = None
+        self.second_var = None
 
         
 
@@ -388,11 +388,12 @@ class Analysis_Window:
         self.iter = 0 
     def update_iter(self):
         self.iter += 1
-    def jump(self):
-        hour = self.hour_var.get()
-        minute = self.minute_var.get()
-        second = self.second_var.get()
+    def jump(self,hour,minute,second):
+        print(self.second_var.get())
         self.iter = int(((hour*3600 - 3600) + (minute*60) + second)/10)
+        print(self.iter)
+        self.next_process()
+        self.refresh()
     def next_loop(self):
         self.update_iter()
         self.acquire_data() #gets next ten seconds
@@ -410,7 +411,8 @@ class Analysis_Window:
         self.summon_graph()
         self.controls.update_time(self)
     def jumpto(self):
-        self.jump()
+        print(self.second_var.get())
+        self.jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
         self.concatenate_data()
         self.refresh()
     def runtill(self):
