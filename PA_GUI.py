@@ -14,8 +14,8 @@ class PA_IntroWindow: #first window for taking the ascii file name
         self.window = frame #takes the universal Tk
         self.window.title("File Input") #names it after the section
 
-        message = "Welcome to the Plethysmography Analysis Alpha Build. To begin take the ascii data of the plethysmography you want to analyze, remove the headers via notepad, and paste the file path below. Or, if you have a savefile with the place" \
-        " you have so far, paste the file location of the savefile."
+        message = "Welcome to the Plethysmography Analysis Beta Build. To begin take the ascii data (or preferably the parquet copy) and open it via file explorer or" \
+        " paste the file location. Additionally, if you have a savefile you can do the same with it."
         t = Text(self.window, width=30, height=10, wrap='word',font=('calibre',12,'normal'))
         t.insert('1.0',message)
         t.grid(row=0,column=0)
@@ -39,7 +39,7 @@ class PA_IntroWindow: #first window for taking the ascii file name
         self.open_explorer.grid(row=3,column=0)
     def summon_window(self): #summons the next window
         try:
-            if self.file:
+            if self.file is not None:
                 new = Analysis_Window(self.file) #initiates the next window
             elif self.savefile:
                 new = Analysis_Savefile(self.savefile)
@@ -152,13 +152,13 @@ class Controls(Frame):
         cb_type.set("Type?")
         cb_type.place(relx=0.75,rely=0.8)
 
-        sub_events = ['']+main.apneas
+        sub_events = ['None']+main.apneas
         cb_subapnea = ttk.Combobox(self.window, values=sub_events)
         cb_subapnea.set("Sub Apbeas?")
         cb_subapnea.place(relx=0.85,rely=0.8)
 
         def submit():
-            new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()]), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()])}
+            new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()] if cb_subapnea.get() != 'None' else []), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()] if cb_subapnea.get() != 'None' else [])}
             main.input_event = new_events.get(cb.get(), None)
             main.add_event()
             cb.destroy()
@@ -168,8 +168,6 @@ class Controls(Frame):
             cb_subapnea.destroy()
             submit_button.destroy()
         def escape(event):
-            print("Yep, something happened")
-            print(event)
             cb.destroy()
             time_entry.destroy()
             duration_entry.destroy()
@@ -192,8 +190,6 @@ class Controls(Frame):
             submit_button.destroy()
             main.remove_event()
         def escape(event):
-            print("Yep, something happened")
-            print(event)
             cb.destroy()
             submit_button.destroy()
         
@@ -240,8 +236,6 @@ class Controls(Frame):
                 cb_subapnea.destroy()
                 submit_edit_button.destroy()
             def escape2(event):
-                print("Yep, something happened")
-                print(event)
                 cb.destroy()
                 time_entry.destroy()
                 duration_entry.destroy()
@@ -252,8 +246,6 @@ class Controls(Frame):
             submit_edit_button = Button(self.window, text="Submit Edits", command=submit_edits)
             submit_edit_button.place(relx=0.7, rely=0.9)
         def escape(event):
-            print("Yep, something happened")
-            print(event)
             cb.destroy()
             submit_button.destroy()
         
@@ -277,6 +269,7 @@ class Analysis_Window:
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
 
         self.total = None
+        self.total_heightref = None
         self.input_event = None
         self.event_loc = None
 
@@ -291,6 +284,8 @@ class Analysis_Window:
         self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
         self.axes = self.fig.add_subplot()
         self.analyze_data() #sends the 10 second interval through standard analysis
+        #if self.total is not None: self.total_heightref = pa.total_deviation(self.total)
+        print(self.total_heightref)
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
@@ -306,14 +301,14 @@ class Analysis_Window:
         else:
             self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.sighs = pa.find_sighs(self.subsection_data,self.skiprows) 
+        self.sighs = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref) 
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
-        self.apneas = pa.apnea_detection(self.main_data,self.main_data.iloc[8*2000:12*2000],sigh=new_sigh)
+        self.apneas = pa.apnea_detection(self.main_data,self.main_data.iloc[8*2000:12*2000],self.skiprows,sigh=new_sigh)
         self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
-        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.events_dataframe['Start']]
-        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and apnea.start_time not in self.events_dataframe['Start']]
+        chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and not pa.np.isclose(self.events_dataframe['Start'],sigh.start_time,atol=1e-5).any()]
+        chunk_a = [apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1] and not pa.np.isclose(self.events_dataframe['Start'],apnea.start_time,atol=1e-5).any()]
         new_events = chunk_s + chunk_a
         for event in new_events:
             self.events_dataframe = pa.pd.concat([self.events_dataframe,pa.pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})],ignore_index=True)
@@ -428,10 +423,11 @@ class Analysis_Window:
         self.save()
         if self.savefile_path:
             plt.close(self.fig)
-            pa.large_data_process(self.total,self.iter)
+            self.events_dataframe = pa.large_data_process(self.total,self.iter,self.total_heightref)
+            print(self.events_dataframe)
             self.updatesave()
     def save(self):
-        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [self.iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")
         if self.savefile_path:
@@ -440,7 +436,7 @@ class Analysis_Window:
                 self.events_dataframe.to_excel(writer,sheet_name='SavedEvents',index=False)
     def updatesave(self):
         print("Updated savefile!")
-        savefile_data = {"Filename": [self.filename], "Current Iteration": [iter]}
+        savefile_data = {"Filename": [self.filename], "Current Iteration": [self.iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         with pa.pd.ExcelWriter(self.savefile_path, engine='xlsxwriter') as writer:
             savefile_dataframe.to_excel(writer,sheet_name='SaveState',index=False)

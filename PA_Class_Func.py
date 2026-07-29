@@ -116,7 +116,7 @@ def signal_prep(signal_name,skiprows):
         pleth_section = total_pleth.slice(skiprows,Nrows).to_pandas()
     if ".ascii" in signal_name:
         total_pleth = None
-        pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=0, names=["Time","Flow"])
+        pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=27, names=["Time","Flow"])
         #^ converts ascii data to pd.dataframe
     normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
@@ -136,7 +136,9 @@ def quick_prep(total_pleth,skiprows):
     return normalized_signal, pleth_ten_section
 
 def total_deviation(total_data):
-    total_data_peakref = total_data["Flow"].std()
+    normalized_total = total_data.clone()
+    normalized_total = normalized_total.with_columns(pl.col("Time"),((pl.col("Flow")-pl.col("Flow").mean())/pl.col("Flow").std())) 
+    total_data_peakref = normalized_total["Flow"].std()
     return total_data_peakref
 
 def peak_means(peak_data):
@@ -145,14 +147,14 @@ def peak_means(peak_data):
 
     return ptsp_mean, ptsp_area_mean
 
-def peak_analysis(normalized_signal,skiprows):
+def peak_analysis(normalized_signal,skiprows,height_ref=None):
     sampling_freq = 1/2000
-    height = normalized_signal['Flow'].std() 
-    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=height*1.1)
-    pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-0.9)*height)
+    height = normalized_signal['Flow'].std() if height_ref==None else height_ref
+    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=height*1.05)
+    pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-1.6)*height)
     pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows*sampling_freq
     pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows*sampling_freq
-    pts_peaks_w =scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
+    pts_peaks_w = scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
     pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
     pts_peaks_width = pts_peaks_w[0]*sampling_freq
     pts_peaks_start = pts_peaks_w[2]*sampling_freq + skiprows*sampling_freq
@@ -164,27 +166,27 @@ def peak_analysis(normalized_signal,skiprows):
     ptsp_mean, ptsp_area_mean = peak_means(ptsp_dataframe)
     return ptsp_dataframe, pts_inversepeaks_loc, ptsp_mean, ptsp_area_mean
 
-def find_sighs(normalized_signal,skiprows): #i could add the peak stuff in here to really condense it 
+def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the peak stuff in here to really condense it 
     sighs = []
-    peak_dataframe, inverse_data, peak_height_mean, peak_area_mean = peak_analysis(normalized_signal,skiprows)
+    peak_dataframe, inverse_data, peak_height_mean, peak_area_mean = peak_analysis(normalized_signal,skiprows,height_ref)
     copy = peak_dataframe.copy(deep=False)
     copy = copy.sort_values(by=['Height'],ascending=False)
     row = copy.head(1).copy()
-    inverse = [x for x in inverse_data if x > row['Start'].iloc[0]+row['Width'].iloc[0]]
+    inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.3 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
     if row['Height'].iloc[0] > 1.25*peak_height_mean and row['Width'].iloc[0] > 0.7*peak_area_mean and inverse is not None:
                 new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
                 sighs.append(new_sigh)
     return sighs
 
-def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None):
+def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None,height_ref=None):
     apneas = []
     i=0
     if sigh: 
         extended_view = normalized_signal.loc[(normalized_signal['Time'] < sigh.start_time), ['Time','Flow']]
         next_view = normalized_signal.loc[(sigh.start_time < normalized_signal['Time']),['Time','Flow']]
-        next_sigh = find_sighs(next_view,skiprows)
-        if len(next_sigh)>0: next_view = next_view.loc[(next_view["Time"] < next_sigh[0]), ['Time','Flow']]
-        new_peaks, _, _, _ = peak_analysis(next_view, skiprows)
+        next_sigh = find_sighs(next_view,skiprows,height_ref)
+        if len(next_sigh)>0: next_view = next_view.loc[(next_view["Time"] < next_sigh[0].start_time), ['Time','Flow']]
+        new_peaks, _, _, _ = peak_analysis(next_view, skiprows,height_ref)
         g = 0
         apneatype='1/2'
         while g < len(new_peaks) - 2:
@@ -197,7 +199,7 @@ def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None):
         extended_view = normalized_subsection
         next_view = None  
     apneatype = "3"
-    extended_peaks, _, _, _ = peak_analysis(extended_view, skiprows)
+    extended_peaks, _, _, _ = peak_analysis(extended_view, skiprows,height_ref)
     while i < len(extended_peaks) - 2:
         if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
             apnea = Apnea(apneatype,start_time=extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i],duration=extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]))
@@ -226,23 +228,23 @@ def apnea_combination(normalized_signal,skiprows,apneas): #I need a way to clean
     return apneas
 
 
-def large_data_process(total_data,iter):
-    total_iter = len(total_data)//20000 - iter
+def large_data_process(total_data,iter,height_ref=None):
+    total_iter = total_data.height//20000 - iter - 360
     chunk_value = 20 #block of time to take
     sampling_interval = 2000 #sampling freq
     Nrows = chunk_value * sampling_interval #total number of rows
     events_container = pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
     with tqdm.tqdm(range(iter,total_iter)) as full_range:
         for i in full_range:
-            skip_rows = skiprows(iter)
+            skip_rows = skiprows(i)
             pleth_section = total_data.slice(skip_rows,Nrows).to_pandas()
             pleth_section["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
             pleth_ten_section = pleth_section.head(int(len(pleth_section)*0.5)).copy() 
-            sigh_container = find_sighs(pleth_section,skip_rows)
+            sigh_container = find_sighs(pleth_section,skip_rows,height_ref)
             new_sigh = sigh_container[-1] if len(sigh_container) > 0 and pleth_ten_section['Time'].iloc[0] < sigh_container[-1].start_time < pleth_ten_section['Time'].iloc[-1] else None
-            apnea_container = apnea_detection(pleth_section,pleth_ten_section,skip_rows,new_sigh)
-            apnea_container = apnea_detection(pleth_section,pleth_section.iloc[8*2000:12*2000],skip_rows,new_sigh)
+            apnea_container = apnea_detection(pleth_section,pleth_ten_section,skip_rows,new_sigh,height_ref)
+            apnea_container = apnea_detection(pleth_section,pleth_section.iloc[8*2000:12*2000],skip_rows,new_sigh,height_ref)
             apnea_container = apnea_combination(pleth_section,skip_rows,apnea_container)
-            eventstoframe(events_container,sigh_container,apnea_container)
+            events_container = eventstoframe(events_container,sigh_container,apnea_container)
     return events_container
-    pass
+
