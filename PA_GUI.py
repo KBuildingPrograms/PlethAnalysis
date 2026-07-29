@@ -285,7 +285,7 @@ class Analysis_Window:
         self.axes = self.fig.add_subplot()
         self.analyze_data() #sends the 10 second interval through standard analysis
         #if self.total is not None: self.total_heightref = pa.total_deviation(self.total)
-        print(self.total_heightref)
+        #print(self.total_heightref)
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
