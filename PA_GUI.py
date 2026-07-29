@@ -309,6 +309,7 @@ class Analysis_Window:
         self.sighs = pa.find_sighs(self.subsection_data,self.skiprows) 
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
+        self.apneas = pa.apnea_detection(self.main_data,self.main_data.iloc[8*2000:12*2000],sigh=new_sigh)
         self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
         chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1] and sigh.start_time not in self.events_dataframe['Start']]
@@ -459,6 +460,7 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.apneas = pa.frametoapnea(self.events_dataframe)
         self.sighs = pa.frametosighs(self.events_dataframe)
 
+        self.total = None
         self.input_event = None
         self.event_loc = None
 

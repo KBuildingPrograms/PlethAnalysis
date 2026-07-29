@@ -121,7 +121,7 @@ def signal_prep(signal_name,skiprows):
     normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
-    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
+    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.5)).copy() 
     return total_pleth, normalized_signal, pleth_ten_section
 
 def quick_prep(total_pleth,skiprows):
@@ -132,7 +132,7 @@ def quick_prep(total_pleth,skiprows):
     normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
-    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
+    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.5)).copy() 
     return normalized_signal, pleth_ten_section
 
 def total_deviation(total_data):
@@ -227,7 +227,7 @@ def apnea_combination(normalized_signal,skiprows,apneas): #I need a way to clean
 
 
 def large_data_process(total_data,iter):
-    total_iter = 360+iter
+    total_iter = len(total_data)//20000 - iter
     chunk_value = 20 #block of time to take
     sampling_interval = 2000 #sampling freq
     Nrows = chunk_value * sampling_interval #total number of rows
@@ -237,10 +237,11 @@ def large_data_process(total_data,iter):
             skip_rows = skiprows(iter)
             pleth_section = total_data.slice(skip_rows,Nrows).to_pandas()
             pleth_section["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
-            pleth_ten_section = pleth_section.head(int(len(pleth_section)*0.6)).copy() 
+            pleth_ten_section = pleth_section.head(int(len(pleth_section)*0.5)).copy() 
             sigh_container = find_sighs(pleth_section,skip_rows)
             new_sigh = sigh_container[-1] if len(sigh_container) > 0 and pleth_ten_section['Time'].iloc[0] < sigh_container[-1].start_time < pleth_ten_section['Time'].iloc[-1] else None
             apnea_container = apnea_detection(pleth_section,pleth_ten_section,skip_rows,new_sigh)
+            apnea_container = apnea_detection(pleth_section,pleth_section.iloc[8*2000:12*2000],skip_rows,new_sigh)
             apnea_container = apnea_combination(pleth_section,skip_rows,apnea_container)
             eventstoframe(events_container,sigh_container,apnea_container)
     return events_container
