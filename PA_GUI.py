@@ -258,12 +258,13 @@ class Controls(Frame):
 
 class Analysis_Window:
     def __init__(self, filename):
+        self.filename = filename
         self.new_window(window) #makes a new window based off of the master Tk window
         self.width = self.window.winfo_width() #takes the width 
         self.height = self.window.winfo_height() #and height of the current window for future reference
         self.iter = 0
         self.skiprows = pa.skiprows(self.iter)
-        self.filename = filename
+        
 
         self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
@@ -292,7 +293,7 @@ class Analysis_Window:
 
     def new_window(self,frame):
         self.window = Toplevel(master=frame)
-        self.window.title("AnalysisWindow")
+        self.window.title(f"AnalysisWindow: {self.filename}")
         self.window.state('zoomed')
     def acquire_data(self):
         self.skiprows = pa.skiprows(self.iter) #take the rows that are needed to skip based on the iteration at the time
@@ -317,6 +318,27 @@ class Analysis_Window:
         self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
         self.event_table.update()
         self.event_table.show()
+    def summon_graph(self):
+            self.axes.clear()
+            self.axes.set_xlim(left=self.subsection_data['Time'].iloc[0],right=self.subsection_data['Time'].iloc[-1])
+            self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
+            self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
+            self.canvas.draw()
+            chunk_s = (sigh for sigh in self.sighs if self.main_data['Time'].iloc[0]-5 < sigh.start_time < self.subsection_data['Time'].iloc[-1])
+            chunk_a = (apnea for apnea in self.apneas if self.main_data['Time'].iloc[0]-5 < apnea.start_time < self.subsection_data['Time'].iloc[-1])
+            for sigh in chunk_s:
+                self.axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
+                for apnea in sigh.sub_apneas:
+                    self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='cyan')
+            for apnea in chunk_a:
+                self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
+                for subapnea in apnea.sub_apneas:
+                    self.axes.axvspan(subapnea.start_time, subapnea.width, alpha=0.3, color='cyan')
+            self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange')
+            toolbar = NavigationToolbar2Tk(self.canvas, self.window)
+            toolbar.update()
+            toolbar.place(relx=0.5,rely=0.6,anchor='c')
+            self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
         new_events = self.events_dataframe.tail(new).copy()
@@ -365,27 +387,6 @@ class Analysis_Window:
             self.sighs.insert(inner_index)
         self.event_loc = None
         self.input_event = None
-    def summon_graph(self):
-        self.axes.clear()
-        self.axes.set_xlim(left=self.subsection_data['Time'].iloc[0],right=self.subsection_data['Time'].iloc[-1])
-        self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
-        self.canvas.draw()
-        chunk_s = (sigh for sigh in self.sighs if self.main_data['Time'].iloc[0]-5 < sigh.start_time < self.subsection_data['Time'].iloc[-1])
-        chunk_a = (apnea for apnea in self.apneas if self.main_data['Time'].iloc[0]-5 < apnea.start_time < self.subsection_data['Time'].iloc[-1])
-        for sigh in chunk_s:
-            self.axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
-            for apnea in sigh.sub_apneas:
-                self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='cyan')
-        for apnea in chunk_a:
-            self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
-            for subapnea in apnea.sub_apneas:
-                self.axes.axvspan(subapnea.start_time, subapnea.width, alpha=0.3, color='cyan')
-        self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange')
-        toolbar = NavigationToolbar2Tk(self.canvas, self.window)
-        toolbar.update()
-        toolbar.place(relx=0.5,rely=0.6,anchor='c')
-        self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
     def reset(self):
         self.iter = 0 
     def update_iter(self):
