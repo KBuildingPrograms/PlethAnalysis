@@ -410,11 +410,6 @@ class Analysis_Window:
         self.display_events()
         self.summon_graph()
         self.controls.update_time(self)
-    def jumpto(self):
-        print(self.second_var.get())
-        self.jump(self.hour_var.get(),self.minute_var.get(),self.second_var.get())
-        self.concatenate_data()
-        self.refresh()
     def runtill(self):
         current = len(self.events_dataframe)
         while len(self.events_dataframe) < current + 1:
