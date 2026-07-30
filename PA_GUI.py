@@ -102,6 +102,9 @@ class Controls(Frame):
         next = Button(self.window, text="Next 10 Seconds", command=control.next_loop)
         next.place(relx=0.42,rely=0.65)
 
+        back = Button(self.window, text="Back 10 Seconds",command=main.back)
+        back.place(relx=0.49,rely=0.65)
+
         refresh = Button(self.window, text="Refresh", command=control.refresh)
         refresh.place(relx=0.42,rely=0.7)
 
@@ -297,6 +300,7 @@ class Analysis_Window:
         self.window.state('zoomed')
     def acquire_data(self):
         self.skiprows = pa.skiprows(self.iter) #take the rows that are needed to skip based on the iteration at the time
+        print(self.skiprows)
         if self.total is not None:
             self.main_data, self.subsection_data = pa.quick_prep(self.total,self.skiprows)
         else:
@@ -324,16 +328,12 @@ class Analysis_Window:
             self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
             self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
             self.canvas.draw()
-            chunk_s = (sigh for sigh in self.sighs if self.main_data['Time'].iloc[0]-5 < sigh.start_time < self.subsection_data['Time'].iloc[-1])
-            chunk_a = (apnea for apnea in self.apneas if self.main_data['Time'].iloc[0]-5 < apnea.start_time < self.subsection_data['Time'].iloc[-1])
-            for sigh in chunk_s:
-                self.axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
-                for apnea in sigh.sub_apneas:
-                    self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='cyan')
-            for apnea in chunk_a:
-                self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
-                for subapnea in apnea.sub_apneas:
-                    self.axes.axvspan(subapnea.start_time, subapnea.width, alpha=0.3, color='cyan')
+            fitting_items = (row for row in self.events_dataframe.itertuples() if self.main_data['Time'].iloc[0]-5 < row.Start < self.subsection_data['Time'].iloc[-1])
+            for row in fitting_items:
+                if row.Event == 'Sigh': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='lightblue')
+                if row.Event == 'Apnea': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='red')
+                if len(row.Subapneas) > 0: 
+                    for subapnea in row.Subapneas: self.axes.axvspan(subapnea.start_time,subapnea.width,alpha=0.3,color='cyan')
             self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange')
             toolbar = NavigationToolbar2Tk(self.canvas, self.window)
             toolbar.update()
@@ -405,6 +405,11 @@ class Analysis_Window:
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
         self.controls.update_time(self)
+    def back(self):
+        if self.iter > 0: self.iter -= 1
+        self.acquire_data()
+        _, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref)
+        self.refresh()
     def next_process(self):
         self.acquire_data()
         self.analyze_data()
