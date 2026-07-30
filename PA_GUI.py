@@ -301,10 +301,10 @@ class Analysis_Window:
         else:
             self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.sighs = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref) 
+        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref) 
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
-        self.apneas = pa.apnea_detection(self.main_data,self.main_data.iloc[7*2000:13*2000],self.skiprows,sigh=new_sigh)
+        self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:13*2000],self.skiprows,new_sigh,self.total_heightref)) 
         self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
         chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.main_data['Time'].iloc[13*2000] and not pa.np.isclose(self.events_dataframe['Start'],sigh.start_time,atol=1e-5).any()]
@@ -367,11 +367,12 @@ class Analysis_Window:
         self.input_event = None
     def summon_graph(self):
         self.axes.clear()
+        self.axes.set_xlim(left=self.subsection_data['Time'].iloc[0],right=self.subsection_data['Time'].iloc[-1])
         self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
         self.canvas.draw()
-        chunk_s = (sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.subsection_data['Time'].iloc[-1])
-        chunk_a = (apnea for apnea in self.apneas if self.subsection_data['Time'].iloc[0] < apnea.start_time < self.subsection_data['Time'].iloc[-1])
+        chunk_s = (sigh for sigh in self.sighs if self.main_data['Time'].iloc[0]-5 < sigh.start_time < self.subsection_data['Time'].iloc[-1])
+        chunk_a = (apnea for apnea in self.apneas if self.main_data['Time'].iloc[0]-5 < apnea.start_time < self.subsection_data['Time'].iloc[-1])
         for sigh in chunk_s:
             self.axes.axvspan(sigh.start_time, sigh.width, alpha=0.3)
             for apnea in sigh.sub_apneas:
@@ -380,6 +381,7 @@ class Analysis_Window:
             self.axes.axvspan(apnea.start_time, apnea.width, alpha=0.3, color='red')
             for subapnea in apnea.sub_apneas:
                 self.axes.axvspan(subapnea.start_time, subapnea.width, alpha=0.3, color='cyan')
+        self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange')
         toolbar = NavigationToolbar2Tk(self.canvas, self.window)
         toolbar.update()
         toolbar.place(relx=0.5,rely=0.6,anchor='c')
