@@ -1,6 +1,8 @@
 from scipy import signal as scp
+import polars as pl
 import pandas as pd
 import numpy as np
+import tqdm
 
 class Apnea:
     def __init__(self,type,start_time,duration,subapnea=None):
@@ -79,36 +81,22 @@ def frametosighs(dataframe):
             sighs.append(new_sigh)
     return sighs
 
-def eventstolist(dataframe):
-        names = []
-        starts = []
-        durations = []
-        types = []
-        question = []
-        subapneas = []
-        for row in dataframe.itertuples(index=False):
-            names.append(row.Event)
-            starts.append(row.Start)
-            durations.append(row.Duration)
-            types.append(row.Type)
-            question.append(row.Questionable)
-            subapneas.append(row.Subapneas)
-        return names, starts, durations, types, question, subapneas
+            
 
-def removefromlists(event,start_list,*lists):
-    loc = start_list.index(event.start_time) if event.start_time in start_list else None
-    if loc:
-        for sublist in lists:
-            sublist.pop(loc)
-
-def editinlists(event,start_list,*lists):
-    loc = start_list.index(event.start_time) if event.start_time in start_list else None
+def editinlists(event,event_dataframe):
+    loc = (event_dataframe['Start'] == event.start_time).idxmax() if event.start_time in event_dataframe['Start'] else None
     start = 0
     if loc:
-        for sublist in lists:
-            sublist[loc]=event[start]
+        for column in event_dataframe.iloc[loc]:
+            event_dataframe[column].iloc[loc] = event[start]
             start += 1
 
+def eventstoframe(current_frame,sighs=[],apneas=[]):
+    total = sighs + apneas
+    for event in total:
+        eventframe = pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})
+        current_frame = pd.concat([current_frame,eventframe],ignore_index=True)
+    return current_frame
 
 def skiprows(iteration):
     skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
@@ -123,30 +111,35 @@ def signal_prep(signal_name,skiprows):
     signal_name = signal_name.replace("\"","") #removes the windows quotations from copying 
     signal_name = signal_name.replace("\n","")
     pleth_graph_ascii = signal_name #takes the ascii input data
-    pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, low_memory=False, header=0, names=["Time","Flow"])
+    if ".parquet" in signal_name:
+        total_pleth = pl.read_parquet(signal_name,columns=["Time","Flow"])
+        pleth_section = total_pleth.slice(skiprows,Nrows).to_pandas()
+    if ".ascii" in signal_name:
+        total_pleth = None
+        pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=27, names=["Time","Flow"])
         #^ converts ascii data to pd.dataframe
-    normalized_signal = pleth_section.copy()
+    normalized_signal = pleth_section.copy().astype('float32')
     normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
 
-    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.6)).copy() 
-    pleth_ten_section.plot(x="Time",y="Flow")
+    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.5)).copy() 
+    return total_pleth, normalized_signal, pleth_ten_section
 
+def quick_prep(total_pleth,skiprows):
+    chunk_value = 20 #block of time to take
+    sampling_interval = 2000 #sampling freq
+    Nrows = chunk_value * sampling_interval #total number of rows
+    pleth_section = total_pleth.slice(skiprows,Nrows).to_pandas()
+    normalized_signal = pleth_section.copy().astype('float32')
+    normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
+
+    pleth_ten_section = normalized_signal.head(int(len(normalized_signal)*0.5)).copy() 
     return normalized_signal, pleth_ten_section
 
-def peak_analysis(normalized_signal,skiprows):
-    sampling_freq = 1/2000
-    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=normalized_signal['Flow'].std())
-    pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-0.8)*normalized_signal['Flow'].std())
-    pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows
-    pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows
-    pts_peaks_w =scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
-    pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
-    pts_peaks_width = pts_peaks_w[0]*sampling_freq
-    pts_peaks_start = pts_peaks_w[2]*sampling_freq + skiprows
-
-    ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
-    ptsp_dataframe = pd.DataFrame(data=ptsp_data)
-    return ptsp_dataframe, pts_inversepeaks_loc
+def total_deviation(total_data):
+    normalized_total = total_data.clone()
+    normalized_total = normalized_total.with_columns(pl.col("Time"),((pl.col("Flow")-pl.col("Flow").mean())/pl.col("Flow").std())) 
+    total_data_peakref = normalized_total["Flow"].std()
+    return total_data_peakref
 
 def peak_means(peak_data):
     ptsp_mean = peak_data['Height'].mean()
@@ -154,45 +147,78 @@ def peak_means(peak_data):
 
     return ptsp_mean, ptsp_area_mean
 
-def find_sighs(peak_dataframe,inverse_data,peak_height_mean,peak_area_mean): #i could add the peak stuff in here to really condense it 
-    sighs = []
-    copy = peak_dataframe.copy()
-    copy.sort_values(by=['Height'])
-    row = copy.head(1).copy()
-    inverse = [x for x in inverse_data if x > row['Start'].iloc[0]+row['Width'].iloc[0]]
-    if row['Height'].iloc[0] > 1.25*peak_height_mean and row['Width'].iloc[0] > 0.8*peak_area_mean and inverse is not None:
-                new_sigh = Sigh(row['Start'],row['Width'])
-                sighs.append(new_sigh)
-    return sighs
+def peak_analysis(normalized_signal,skiprows,height_ref=None):
+    sampling_freq = 1/2000
+    height = normalized_signal['Flow'].std() if height_ref==None else height_ref
+    pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=height*1.1)
+    pts_inversepeaks = scp.find_peaks(-normalized_signal["Flow"], height=(-1.6)*height)
+    pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows*sampling_freq
+    pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows*sampling_freq
+    pts_peaks_w = scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
+    pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
+    pts_peaks_width = pts_peaks_w[0]*sampling_freq
+    pts_peaks_start = pts_peaks_w[2]*sampling_freq + skiprows*sampling_freq
 
-def postsigh_apnea(normalized_signal, sigh):
-    #iterating through sighs
-    extended_view = normalized_signal.loc[(sigh.start_time < normalized_signal['Time']) & (normalized_signal['Time'] < sigh.start_time + 10), ['Time','Flow']] #extending 10 seconds out from sigh
-    extended_peaks, extended_inverse = peak_analysis(extended_view, extended_view['Time'].iloc[0]) #gets the peaks of that ten second interval
-    extended_peak_hmean, extended_peak_amean = peak_means(extended_peaks)
-    next_sigh = find_sighs(extended_peaks,extended_inverse,extended_peak_hmean, extended_peak_amean) #if there's another sigh within ten seconds, catch it
-    i=0 #indexing value for while loops
-    apneas = [] #to acquire apneas
-    if len(next_sigh) > 0: #if there is a sigh
-        extended_peak_view = extended_peaks.loc[next_sigh[0].start_time > extended_peaks['Time']] #condense the extended peak view to end before the next sigh
-        while i < len(extended_peak_view) - 2: #While the index is less than the maximum
-            if extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i]+extended_peak_view["Width"].iloc[i]) > 0.7999: 
-                #if the distance between the start of the next peak and the end of the first peak is greater than 0.7999, that means there's an apnea
-                apnea = Apnea("1/2", extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i], extended_peak_view["Start"].iloc[i+1] - (extended_peak_view["Start"].iloc[i] + extended_peak_view["Width"].iloc[i]))
-                #the apnea is defined as type 1 or 2, starting at the end of the first peak, and has a duration from the end of the last peak to the start of the next, placed in a list so more duration can be added if needed
-                sigh.add_subapnea(apnea)
-                apneas.append(apnea) #add the apnea to a list of apneas
-            i+=1 #move on to next peak
-    else:
-        while i < len(extended_peaks) - 2:
-            #same process but iterates from the sigh to 10 seconds after the sigh
-            if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
-                apnea = Apnea("1/2", extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i], extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i] + extended_peaks["Width"].iloc[i]))
+    ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
+    ptsp_dataframe = pd.DataFrame(data=ptsp_data)
+    
+
+    ptsp_mean, ptsp_area_mean = peak_means(ptsp_dataframe)
+    return ptsp_dataframe, pts_inversepeaks_loc, ptsp_mean, ptsp_area_mean
+
+def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the peak stuff in here to really condense it 
+    sighs = []
+    peak_dataframe, inverse_data, peak_height_mean, peak_area_mean = peak_analysis(normalized_signal,skiprows,height_ref)
+    copy = peak_dataframe.copy(deep=False)
+    copy = copy.sort_values(by=['Height'],ascending=False)
+    row = copy.head(1).copy()
+    inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
+    if row['Height'].iloc[0] > 1.25*peak_height_mean and row['Width'].iloc[0] > 0.7*peak_area_mean and inverse is not None:
+                new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
+                sighs.append(new_sigh)
+    return sighs, peak_dataframe
+
+def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None,height_ref=None):
+    apneas = []
+    i=0
+    if sigh: 
+        extended_view = normalized_subsection.loc[(normalized_subsection['Time'] < sigh.start_time), ['Time','Flow']]
+        next_view = normalized_signal.loc[(sigh.start_time < normalized_signal['Time'])&(normalized_signal['Time'] < sigh.start_time + 10),['Time','Flow']]
+        next_sigh, _ = find_sighs(next_view,skiprows,height_ref)
+        if len(next_sigh)>0: next_view = next_view.loc[(next_view["Time"] < next_sigh[0].start_time), ['Time','Flow']]
+        new_peaks, _, _, _ = peak_analysis(next_view, skiprows,height_ref)
+        g = 0
+        apneatype='1/2'
+        while g < len(new_peaks) - 2:
+            if new_peaks["Start"].iloc[i+1] - (new_peaks["Start"].iloc[i]+new_peaks["Width"].iloc[i]) > 0.7999:
+                apnea = Apnea(apneatype,start_time=new_peaks["Start"].iloc[i]+new_peaks["Width"].iloc[i],duration=new_peaks["Start"].iloc[i+1] - (new_peaks["Start"].iloc[i]+new_peaks["Width"].iloc[i]))
                 sigh.add_subapnea(apnea)
                 apneas.append(apnea)
-            i+=1
-    if len(apneas) < 1:
-        sigh.lack() #if there are no apneas after the sigh, the sigh may be a sniff, and needs to be highlighted differently
+            g+=1
+    else:
+        extended_view = normalized_subsection
+        next_view = None  
+    apneatype = "3"
+    extended_peaks, _, _, _ = peak_analysis(extended_view, skiprows,height_ref)
+    while i < len(extended_peaks) - 2:
+        if extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]) > 0.7999:
+            apnea = Apnea(apneatype,start_time=extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i],duration=extended_peaks["Start"].iloc[i+1] - (extended_peaks["Start"].iloc[i]+extended_peaks["Width"].iloc[i]))
+            apneas.append(apnea)
+        i+=1
+    return apneas
+
+def quick_apnea(normalized_subsection,transition_section,skiprows,sigh=None,height_ref=None):
+    i = 0
+    apneas = []
+    apneatype = '3' if sigh is None else '1/2'
+    total = pd.concat([normalized_subsection,transition_section.loc[(transition_section['Time']>normalized_subsection['Time'].iloc[-1])]],ignore_index=True)
+    new_peaks, _, _, _ = peak_analysis(total, skiprows,height_ref)
+    peak_range = new_peaks.loc[(new_peaks['Time'] < transition_section['Time'].iloc[-1])&(new_peaks['Time'] > transition_section['Time'].iloc[0]), ['Time','Height','Width','Start']]
+    while i < len(peak_range) - 2:
+        if peak_range["Start"].iloc[i+1] - (peak_range["Start"].iloc[i]+peak_range["Width"].iloc[i]) > 0.7999:
+            apnea = Apnea(apneatype,start_time=peak_range["Start"].iloc[i]+peak_range["Width"].iloc[i],duration=peak_range["Start"].iloc[i+1] - (peak_range["Start"].iloc[i]+peak_range["Width"].iloc[i]))
+            apneas.append(apnea)
+        i+=1
     return apneas
 
 def matching_apnea(apnea,apneas):
@@ -201,33 +227,37 @@ def matching_apnea(apnea,apneas):
         for apnea2 in apneas
     )
 
-def type3_apnea(peak_data, apneas):
-    i = 0
-    while i < len(peak_data) - 2:
-        if peak_data["Start"].iloc[i+1] - (peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i]) > 0.7999 and (not matching_apnea(peak_data["Start"].iloc[i]+ peak_data["Width"].iloc[i],apneas)): 
-             #if there's a gap in the peaks big enough for an apnea AND it's not an apnea already saved, it's a type 3
-             apnea = Apnea("3", peak_data["Start"].iloc[i]+peak_data["Width"][i], peak_data["Start"].iloc[i+1] - (peak_data["Start"][i] + peak_data["Width"][i]))
-             apneas.append(apnea)
-        i+=1
-    return apneas
-
-def apnea_combination(normalized_signal, apneas): #I need a way to clean this, good god
+def apnea_combination(normalized_signal,skiprows,apneas): #I need a way to clean this, good god
     removed_apneas = []
     for apnea in apneas:
-        extended_view, extended_inverse = peak_analysis(normalized_signal, apnea.start_time)
-        ev_hmean, ev_amean = peak_means(extended_view)
-        sigh_caught = find_sighs(extended_view,extended_inverse,ev_hmean,ev_amean)
-       
-        if len(sigh_caught) > 0:
-            for apnea2 in apneas: 
-                if apnea.start_time < apnea2.start_time < sigh_caught[0].start_time:
-                    apnea.add_subapnea(apnea2)
-                    removed_apneas.append(apnea2)
-        else:
-            for apnea2 in apneas: 
-                if apnea.start_time < apnea2.duration < extended_view["Time"].iloc[0]:
-                    apnea.add_subapnea(apnea2)
-                    removed_apneas.append(apnea2)
+        sigh_caught, _ = find_sighs(normalized_signal,skiprows)
+        end = sigh_caught[0].start_time if len(sigh_caught) > 0 else normalized_signal['Time'].loc[(normalized_signal['Time'] < apnea.start_time + 10)].iloc[-1]
+        for apnea2 in apneas: 
+            if apnea.start_time < apnea2.start_time < end:
+                apnea.add_subapnea(apnea2)
+                removed_apneas.append(apnea2)
 
     apneas = [apnea for apnea in apneas if apnea not in removed_apneas]
     return apneas
+
+
+def large_data_process(total_data,iter,height_ref=None):
+    total_iter = total_data.height//20000 - iter - 360
+    chunk_value = 20 #block of time to take
+    sampling_interval = 2000 #sampling freq
+    Nrows = chunk_value * sampling_interval #total number of rows
+    events_container = pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
+    with tqdm.tqdm(range(iter,total_iter)) as full_range:
+        for i in full_range:
+            skip_rows = skiprows(i)
+            pleth_section = total_data.slice(skip_rows,Nrows).to_pandas()
+            pleth_section["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
+            pleth_ten_section = pleth_section.head(int(len(pleth_section)*0.5)).copy() 
+            sigh_container = find_sighs(pleth_section,skip_rows,height_ref)
+            new_sigh = sigh_container[-1] if len(sigh_container) > 0 and pleth_ten_section['Time'].iloc[0] < sigh_container[-1].start_time < pleth_ten_section['Time'].iloc[-1] else None
+            apnea_container = apnea_detection(pleth_section,pleth_ten_section,skip_rows,new_sigh,height_ref)
+            apnea_container += quick_apnea(pleth_section,pleth_section.iloc[9*2000:13*2000],skip_rows,new_sigh,height_ref)
+            apnea_container = apnea_combination(pleth_section,skip_rows,apnea_container)
+            events_container = eventstoframe(events_container,sigh_container,apnea_container)
+    return events_container
+
