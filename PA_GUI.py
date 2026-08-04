@@ -39,20 +39,22 @@ class PA_IntroWindow: #first window for taking the ascii file name
 
         self.open_explorer = Button(self.window, text='Open File Folder', command=self.file_selection)
         self.open_explorer.grid(row=3,column=0)
+        self.file = None
+        self.savefile = None
     def summon_window(self): #summons the next window
-        try:
-            if self.file is not None:
-                new = Analysis_Window(self.file) #initiates the next window
-            elif self.savefile:
-                new = Analysis_Savefile(self.savefile)
-        except Exception as e:
-            print(e)
+        if self.file is not None:
+            new = Analysis_Window(self.file) #initiates the next window
+        elif self.savefile is not None:
+            new = Analysis_Savefile(self.savefile)
+        print("does this execute while...")
     def file_selection(self):
         fn =  askopenfilename()
         if ".xlsx" in fn:
             self.savefile = fn
+            self.file = None
         elif ".ascii" or ".parquet"in fn:
             self.file = fn
+            self.savefile = None
         else:
             pass
         self.summon_window()
@@ -334,7 +336,10 @@ class Analysis_Window:
                 if row.Event == 'Sigh': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='lightblue')
                 if row.Event == 'Apnea': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='red')
                 if len(row.Subapneas) > 0: 
-                    for subapnea in row.Subapneas: self.axes.axvspan(subapnea.start_time,subapnea.width,alpha=0.3,color='cyan')
+                    try:
+                        for subapnea in row.Subapneas: self.axes.axvspan(subapnea.start_time,subapnea.width,alpha=0.3,color='cyan')
+                    except:
+                        pass
             self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange',grid=True)
             toolbar = NavigationToolbar2Tk(self.canvas, self.window)
             toolbar.update()
@@ -450,6 +455,7 @@ class Analysis_Window:
 
 
 
+
 class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods to clean the window
     def __init__(self,filename):
         self.file_var = filename
@@ -471,16 +477,26 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.second_var = IntVar()
 
         self.controls = Controls(self)
-
+        self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
+        self.axes = self.fig.add_subplot()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
     def acquire_savedata(self):
-        save_data = pa.pd.read_excel(self.file_var.get(),sheet_name=0)
-        self.events_dataframe = pa.pd.read_excel(self.file_var.get(),sheet_name=1)
+        save_data = pa.pd.read_excel(self.file_var,sheet_name=0)
+        self.events_dataframe = pa.pd.read_excel(self.file_var,sheet_name=1)
+        for row in self.events_dataframe['Subapneas']:
+            row = row.strip()
+            try:
+                row = eval(row)
+            except:
+                row = row.replace("[","")
+                row = row.replace("]","")
+                row = row.split(", ")
+                row = [pa.stringstoapnea(row)]
         self.filename = save_data['Filename'].iloc[0]
-        self.iter = save_data["Current Iteration"].iloc[0]
+        self.iter = int(save_data["Current Iteration"].iloc[0])
         self.skiprows = pa.skiprows(self.iter)
-        self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
+        self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows)
     def save(self):
         savefile_data = {"Filename": [self.filename], "Current Iteration": [self.iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)

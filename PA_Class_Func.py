@@ -81,7 +81,13 @@ def frametosighs(dataframe):
             sighs.append(new_sigh)
     return sighs
 
-            
+def stringstoapnea(list):
+    typestring = list[0]
+    a_type = typestring[-1]
+    start = float(list[1].replace("Start: ",""))
+    duration = float(list[2].replace("Duration: ",""))
+    apnea = Apnea(a_type,start,duration)
+    return apnea
 
 def editinlists(event,event_dataframe):
     loc = (event_dataframe['Start'] == event.start_time).idxmax() if event.start_time in event_dataframe['Start'] else None
