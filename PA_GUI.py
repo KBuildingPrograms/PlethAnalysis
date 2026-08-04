@@ -492,7 +492,7 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
                 row = row.replace("[","")
                 row = row.replace("]","")
                 row = row.split(", ")
-                row = [pa.stringstoapnea(row)]
+                row = pa.stringstoapnea(row)
         self.filename = save_data['Filename'].iloc[0]
         self.iter = int(save_data["Current Iteration"].iloc[0])
         self.skiprows = pa.skiprows(self.iter)
