@@ -1,6 +1,8 @@
 from tkinter import *
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename, asksaveasfilename
+import math
+import threading
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -300,16 +302,15 @@ class Analysis_Window:
         self.window.state('zoomed')
     def acquire_data(self):
         self.skiprows = pa.skiprows(self.iter) #take the rows that are needed to skip based on the iteration at the time
-        print(self.skiprows)
         if self.total is not None:
             self.main_data, self.subsection_data = pa.quick_prep(self.total,self.skiprows)
         else:
             self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref) 
+        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref)
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
-        self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:13*2000],self.skiprows,new_sigh,self.total_heightref)) 
+        self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:12*2000],self.skiprows,new_sigh,self.total_heightref)) 
         self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
         chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.main_data['Time'].iloc[13*2000] and not pa.np.isclose(self.events_dataframe['Start'],sigh.start_time,atol=1e-5).any()]
@@ -334,7 +335,7 @@ class Analysis_Window:
                 if row.Event == 'Apnea': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='red')
                 if len(row.Subapneas) > 0: 
                     for subapnea in row.Subapneas: self.axes.axvspan(subapnea.start_time,subapnea.width,alpha=0.3,color='cyan')
-            self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange')
+            self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange',grid=True)
             toolbar = NavigationToolbar2Tk(self.canvas, self.window)
             toolbar.update()
             toolbar.place(relx=0.5,rely=0.6,anchor='c')
@@ -392,9 +393,7 @@ class Analysis_Window:
     def update_iter(self):
         self.iter += 1
     def jump(self,hour,minute,second):
-        print(self.second_var.get())
-        self.iter = int(((hour*3600 - 3600) + (minute*60) + second)/10)
-        print(self.iter)
+        self.iter = int(((hour*3600 - 3600) + (minute*60) + math.floor(second/10)*10)/10)
         self.next_process()
         self.refresh()
     def next_loop(self):
@@ -427,6 +426,8 @@ class Analysis_Window:
     def runthrough(self):
         self.save()
         if self.savefile_path:
+            warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',12,'bold'))
+            warning_label.place(relx=0.7,rely=0.9)
             plt.close(self.fig)
             self.events_dataframe = pa.large_data_process(self.total,self.iter,self.total_heightref)
             print(self.events_dataframe)
