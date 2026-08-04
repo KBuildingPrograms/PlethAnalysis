@@ -83,7 +83,7 @@ def frametosighs(dataframe):
 
 def stringstoapnea(list):
     apneas = []
-    for i in range(0,len(list)/3+1):
+    for i in range(0,len(list)//3+1):
         typestring = list[i*3]
         a_type = typestring[-1]
         start = float(list[(i*3)+1].replace("Start: ",""))
