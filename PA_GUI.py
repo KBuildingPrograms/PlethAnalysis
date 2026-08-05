@@ -81,9 +81,12 @@ class PA_IntroWindow: #first window for taking the ascii file name
             error_note.grid(row=3,column=0)
 
 
-class Controls(Frame):
+class Controls():
     def __init__(self, main):
         self.window = main.window
+        self.main_buttonframe = Frame(main.eventalter_frame,width=int(main.width/3), height=int(main.height/4))
+        self.sub_controlsframe = Frame(main.eventalter_frame,width=int(main.width/3),height=int(main.height/4))
+        self.activatedframe = Frame(self.sub_controlsframe,width=int(main.width/3),height=int(main.height/8))
         control = main
 
         hour = main.iter//360 + 1
@@ -94,42 +97,45 @@ class Controls(Frame):
         main.minute_var = IntVar(main.window, minute)
         main.second_var = IntVar(main.window, second)
 
-        H_entry = Entry(self.window, textvariable=main.hour_var, font=('calibre',12,'normal'))
-        H_entry.place(relx=0.6, rely=0.6)
-        M_entry = Entry(self.window, textvariable=main.minute_var, font=('calibre',12,'normal'))
-        M_entry.place(relx=0.7, rely=0.6)
-        S_entry = Entry(self.window, textvariable=main.second_var, font=('calibre',12,'normal'))
-        S_entry.place(relx=0.8, rely=0.6)
-        jump = Button(self.window, text='Jump',command=lambda : main.jump(main.hour_var.get(),main.minute_var.get(),main.second_var.get()))
-        jump.place(relx = 0.8, rely=0.65)
+        jump = Button(self.sub_controlsframe, text='Jump',command=lambda : main.jump(main.hour_var.get(),main.minute_var.get(),main.second_var.get()))
+        jump.pack(side=BOTTOM,anchor='ne')
+        H_entry = Entry(self.sub_controlsframe, textvariable=main.hour_var, font=('calibre',12,'normal'))
+        H_entry.pack(side=RIGHT,anchor='n')
+        M_entry = Entry(self.sub_controlsframe, textvariable=main.minute_var, font=('calibre',12,'normal'))
+        M_entry.pack(side=RIGHT,anchor='n')
+        S_entry = Entry(self.sub_controlsframe, textvariable=main.second_var, font=('calibre',12,'normal'))
+        S_entry.pack(side=RIGHT,anchor='n')
+        self.activatedframe.pack(side=TOP,anchor='c')
 
-        next = Button(self.window, text="Next 10 Seconds", command=control.next_loop)
-        next.place(relx=0.42,rely=0.65)
+        next_button = Button(self.main_buttonframe, text="Next 10 Seconds", command=control.next_loop)
+        next_button.pack(side=TOP,anchor='w')
 
-        back = Button(self.window, text="Back 10 Seconds",command=main.back)
-        back.place(relx=0.49,rely=0.65)
+        back = Button(self.main_buttonframe, text="Back 10 Seconds",command=main.back)
+        back.pack(side=TOP,anchor='w')
 
-        refresh = Button(self.window, text="Refresh", command=control.refresh)
-        refresh.place(relx=0.42,rely=0.7)
+        refresh = Button(self.main_buttonframe, text="Refresh", command=control.refresh)
+        refresh.pack(side=TOP,anchor='w')
 
-        save = Button(self.window, text="Save Progress", command=control.save)
-        save.place(relx=0.9,rely=0.9)
+        save = Button(self.main_buttonframe, text="Save Progress", command=control.save)
+        save.pack(side=TOP,anchor='w')
 
-        run_till = Button(self.window, text="Run till next detection", command=control.runtill)
-        run_till.place(relx=0.42,rely=0.75)
+        run_till = Button(self.main_buttonframe, text="Run till next detection", command=control.runtill)
+        run_till.pack(side=TOP,anchor='w')
 
-        add = Button(self.window, text="Add Event", command=main.get_event)
-        add.place(relx=0.42,rely=0.8)
+        add = Button(self.main_buttonframe, text="Add Event", command=main.get_event)
+        add.pack(side=TOP,anchor='w')
 
-        remove = Button(self.window, text="Remove Event", command=main.removal_loc)
-        remove.place(relx=0.42, rely=0.85)
+        remove = Button(self.main_buttonframe, text="Remove Event", command=main.removal_loc)
+        remove.pack(side=TOP,anchor='w')
 
-        edit = Button(self.window, text="Edit Event", command=main.edit_loc)
-        edit.place(relx=0.42, rely=0.9)
+        edit = Button(self.main_buttonframe, text="Edit Event", command=main.edit_loc)
+        edit.pack(side=TOP,anchor='w')
 
         if main.total is not None:
-            run_through = Button(self.window,text="Run Through",command=main.runthrough)
-            run_through.place(relx=0.42,rely=0.95)
+            run_through = Button(self.main_buttonframe,text="Run Through",command=main.runthrough)
+            run_through.pack(side=TOP,anchor='w')
+        self.main_buttonframe.pack(side=LEFT,padx=15)
+        self.sub_controlsframe.pack(side=LEFT,anchor='n')
 
         settings = Menu(main.menubar,tearoff=0)
         main.menubar.add_cascade(label='Settings',menu=settings)
@@ -148,25 +154,25 @@ class Controls(Frame):
 
     def add_info(self,main):
         events = ['Sigh','Apnea','None']
-        cb = ttk.Combobox(self.window, values=events)
+        cb = ttk.Combobox(self.activatedframe, values=events)
         cb.set("Event")
         cb.place(relx=0.58,rely=0.8)
 
-        start_var = DoubleVar(self.window)
-        time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
+        start_var = DoubleVar(self.activatedframe)
+        time_entry = Entry(self.activatedframe,textvariable=start_var,font=('calibre',12,'normal'))
         time_entry.place(relx=0.68,rely=0.8)
 
-        duration_var = DoubleVar(self.window)
-        duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
+        duration_var = DoubleVar(self.activatedframe)
+        duration_entry = Entry(self.activatedframe,textvariable=duration_var,font=('calibre',12,'normal'))
         duration_entry.place(relx=0.72,rely=0.8)
 
         types = ['1/2','3','N/A']
-        cb_type = ttk.Combobox(self.window, values=types)
+        cb_type = ttk.Combobox(self.activatedframe, values=types)
         cb_type.set("Type?")
         cb_type.place(relx=0.75,rely=0.8)
 
         sub_events = ['None']+main.apneas
-        cb_subapnea = ttk.Combobox(self.window, values=sub_events)
+        cb_subapnea = ttk.Combobox(self.activatedframe, values=sub_events)
         cb_subapnea.set("Sub Apbeas?")
         cb_subapnea.place(relx=0.85,rely=0.8)
 
@@ -188,12 +194,12 @@ class Controls(Frame):
             cb_subapnea.destroy()
             submit_button.destroy()
         
-        self.window.bind('<Escape>', escape)
-        submit_button = Button(self.window, text="Submit Event", command=submit)
+        self.activatedframe.bind('<Escape>', escape)
+        submit_button = Button(self.activatedframe, text="Submit Event", command=submit)
         submit_button.place(relx=0.75,rely=0.85)
     def del_info(self, main):
         event_list = list(range(1,len(main.events_dataframe)+1))
-        cb = ttk.Combobox(self.window, values=event_list)
+        cb = ttk.Combobox(self.activatedframe, values=event_list)
         cb.set("Event to Delete")
         cb.place(relx=0.6, rely=0.8)
         def submit():
@@ -206,34 +212,34 @@ class Controls(Frame):
             cb.destroy()
             submit_button.destroy()
         
-        self.window.bind('<Escape>', escape)
-        submit_button = Button(self.window, text="Submit", command=submit)
+        self.activatedframe.bind('<Escape>', escape)
+        submit_button = Button(self.activatedframe, text="Submit", command=submit)
         submit_button.place(relx=0.705, rely=0.795)
     def edit_info(self,main):
         event_list = main.events_dataframe.values.tolist()
-        cb = ttk.Combobox(self.window, values=event_list)
+        cb = ttk.Combobox(self.activatedframe, values=event_list)
         cb.set("Event to Edit")
         cb.place(relx=0.5, rely=0.9)
         def submit_loc():
             event_loc = cb.current() - 1
             event_edited = event_list[event_loc]
             cb.destroy()
-            start_var = DoubleVar(self.window, value=event_edited[1])
-            time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
+            start_var = DoubleVar(self.activatedframe, value=event_edited[1])
+            time_entry = Entry(self.activatedframe,textvariable=start_var,font=('calibre',12,'normal'))
             time_entry.place(relx=0.5,rely=0.75)
 
-            duration_var = DoubleVar(self.window, value=event_edited[2])
-            duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
+            duration_var = DoubleVar(self.activatedframe, value=event_edited[2])
+            duration_entry = Entry(self.activatedframe,textvariable=duration_var,font=('calibre',12,'normal'))
             duration_entry.place(relx=0.6,rely=0.75)
 
             types = ['1/2','3','N/A']
-            cb_type = ttk.Combobox(self.window, values=types)
+            cb_type = ttk.Combobox(self.activatedframe, values=types)
             cb_type.set("Type?")
             cb_type.place(relx=0.75,rely=0.75)
 
             sub_events = main.apneas.copy()
             sub_events.insert(0,'')
-            cb_subapnea = ttk.Combobox(self.window, values=sub_events)
+            cb_subapnea = ttk.Combobox(self.activatedframe, values=sub_events)
             cb_subapnea.set("Sub Apbeas?")
             cb_subapnea.place(relx=0.85,rely=0.75)
             submit_button.destroy()
@@ -256,15 +262,15 @@ class Controls(Frame):
                 cb_type.destroy()
                 cb_subapnea.destroy()
                 submit_edit_button.destroy()
-            self.window.bind('<Escape>', escape2)
-            submit_edit_button = Button(self.window, text="Submit Edits", command=submit_edits)
+            self.activatedframe.bind('<Escape>', escape2)
+            submit_edit_button = Button(self.activatedframe, text="Submit Edits", command=submit_edits)
             submit_edit_button.place(relx=0.7, rely=0.8)
         def escape(event):
             cb.destroy()
             submit_button.destroy()
         
-        self.window.bind('<Escape>', escape)
-        submit_button = Button(self.window, text="Submit", command=submit_loc)
+        self.activatedframe.bind('<Escape>', escape)
+        submit_button = Button(self.activatedframe, text="Submit", command=submit_loc)
         submit_button.place(relx=0.6, rely=0.895)
 
 class Settings_Window:
@@ -289,7 +295,8 @@ class Analysis_Window:
         self.skiprows = pa.skiprows(self.iter)
         
 
-        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
+        self.eventalter_frame = Frame(self.window, width=int(self.width),height=int(self.height/4))
+        self.event_frame = Frame(self.eventalter_frame, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
 
         self.total = None
@@ -307,16 +314,16 @@ class Analysis_Window:
         self.sighheighttolerance = None
 
         self.acquire_data()
-        self.controls = Controls(self)
-        self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
+        self.fig = Figure(figsize=(14,4),dpi=110,linewidth=0.3)
         self.axes = self.fig.add_subplot()
         self.analyze_data() #sends the 10 second interval through standard analysis
         #if self.total is not None: self.total_heightref = pa.total_deviation(self.total)
         #print(self.total_heightref)
         self.concatenate_data()
-        self.display_events() #display the list of events from the events dataframe
+        self.display_events() 
         self.summon_graph()
-        self.event_table.redraw()
+        self.eventalter_frame.pack(side=TOP,anchor='sw')
+        self.controls = Controls(self)
 
 
     def new_window(self,frame):
@@ -331,10 +338,10 @@ class Analysis_Window:
         else:
             self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref)
+        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows)
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
-        self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:12*2000],self.skiprows,new_sigh,self.total_heightref)) 
+        self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:12*2000],self.skiprows,new_sigh,self.heightref)) 
         self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
         chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.main_data['Time'].iloc[13*2000] and not pa.np.isclose(self.events_dataframe['Start'],sigh.start_time,atol=1e-5).any()]
@@ -343,8 +350,8 @@ class Analysis_Window:
         for event in new_events:
             self.events_dataframe = pa.pd.concat([self.events_dataframe,pa.pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})],ignore_index=True)
     def display_events(self):
-        self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=True)
-        self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
+        self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=False)
+        self.event_frame.pack(side=LEFT,anchor='sw')
         self.event_table.update()
         self.event_table.show()
     def summon_graph(self):
@@ -365,8 +372,8 @@ class Analysis_Window:
         self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange',grid=True)
         toolbar = NavigationToolbar2Tk(self.canvas, self.window)
         toolbar.update()
-        toolbar.place(relx=0.5,rely=0.6,anchor='c')
-        self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
+        self.canvas.get_tk_widget().pack(side=TOP,anchor="n")
+        #toolbar.pack(anchor='n')
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
         new_events = self.events_dataframe.tail(new).copy()
@@ -435,7 +442,7 @@ class Analysis_Window:
     def back(self):
         if self.iter > 0: self.iter -= 1
         self.acquire_data()
-        _, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref)
+        _, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.heightref)
         self.refresh()
     def next_process(self):
         self.acquire_data()
@@ -455,9 +462,9 @@ class Analysis_Window:
         self.save()
         if self.savefile_path:
             warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',12,'bold'))
-            warning_label.place(relx=0.7,rely=0.9)
+            warning_label.pack(anchor='s')
             plt.close(self.fig)
-            self.events_dataframe = pa.large_data_process(self.total,self.iter,self.total_heightref)
+            self.events_dataframe = pa.large_data_process(self.total,self.iter,self.heightref)
             print(self.events_dataframe)
             self.updatesave()
     def save(self):
