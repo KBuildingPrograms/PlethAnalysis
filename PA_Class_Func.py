@@ -111,6 +111,7 @@ def skiprows(iteration):
     skiprows = 2000*(3600 + iteration*10) #checks the iteration that we're on and takes the next 10 second chunk, always skips the first hour
     return skiprows
 
+
 def signal_prep(signal_name,skiprows):
     chunk_value = 20 #block of time to take
     sampling_interval = 2000 #sampling freq
@@ -182,7 +183,7 @@ def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the pea
     copy = copy.sort_values(by=['Height'],ascending=False)
     row = copy.head(1).copy()
     inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
-    if -row['Height'].iloc[0] < 0.98*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 0.8*peak_area_mean and len(inverse)>0:
+    if -row['Height'].iloc[0] < 0.98*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 0.95*peak_area_mean and len(inverse)>0:
                 new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
                 sighs.append(new_sigh)
     return sighs, peak_dataframe
@@ -206,6 +207,7 @@ def apnea_detection(normalized_signal,normalized_subsection,skiprows,sigh=None,h
                 sigh.add_subapnea(apnea)
                 apneas.append(apnea)
             g+=1
+        if len(apneas) <= 0: sigh.lack()
     else:
         extended_view = normalized_subsection
         next_view = None  
@@ -266,7 +268,7 @@ def large_data_process(total_data,iter,height_ref=None):
             pleth_section = total_data.slice(skip_rows,Nrows).to_pandas()
             pleth_section["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
             pleth_ten_section = pleth_section.head(int(len(pleth_section)*0.5)).copy() 
-            sigh_container = find_sighs(pleth_section,skip_rows,height_ref)
+            sigh_container, _ = find_sighs(pleth_section,skip_rows,height_ref)
             new_sigh = sigh_container[-1] if len(sigh_container) > 0 and pleth_ten_section['Time'].iloc[0] < sigh_container[-1].start_time < pleth_ten_section['Time'].iloc[-1] else None
             apnea_container = apnea_detection(pleth_section,pleth_ten_section,skip_rows,new_sigh,height_ref)
             apnea_container += quick_apnea(pleth_section,pleth_section.iloc[9*2000:12*2000],skip_rows,new_sigh,height_ref)

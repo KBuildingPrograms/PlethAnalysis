@@ -11,6 +11,7 @@ import sys
 import traceback
 import PA_Class_Func as pa
 
+print("Loading...")
 class PA_IntroWindow: #first window for taking the ascii file name
     def __init__(self,frame):
         self.window = frame #takes the universal Tk
@@ -129,6 +130,12 @@ class Controls(Frame):
         if main.total is not None:
             run_through = Button(self.window,text="Run Through",command=main.runthrough)
             run_through.place(relx=0.42,rely=0.95)
+
+        settings = Menu(main.menubar,tearoff=0)
+        main.menubar.add_cascade(label='Settings',menu=settings)
+        #Add all adjustment commands here
+        #I think I'm going to add a new window for settings
+            #and add settings to the savefile
 
     def update_time(self, main):
         hour = main.iter//360 + 1
@@ -260,7 +267,16 @@ class Controls(Frame):
         submit_button = Button(self.window, text="Submit", command=submit_loc)
         submit_button.place(relx=0.6, rely=0.895)
 
-
+class Settings_Window:
+    def __init__(self,main):
+        self.main_ref = main
+        self.frame = Toplevel(master=window)
+        self.example_fig = Figure(figsize=(8,4),dpi=90,linewidth=0.1)
+        self.example_axes = self.example_fig.add_subplot()
+    def load_sliders(self,main):
+        current_height = DoubleVar(value=main.heightref)
+        peak_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal',)
+        
     
 
 class Analysis_Window:
@@ -277,15 +293,18 @@ class Analysis_Window:
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
 
         self.total = None
-        self.total_heightref = None
+        
         self.input_event = None
         self.event_loc = None
 
         self.hour_var = None
         self.minute_var = None
         self.second_var = None
-
         
+        self.heightref = None
+        self.inverseheightref = None
+        self.sighareatolerance = None
+        self.sighheighttolerance = None
 
         self.acquire_data()
         self.controls = Controls(self)
@@ -297,10 +316,12 @@ class Analysis_Window:
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
-        print(self.apneas)
+        self.event_table.redraw()
+
 
     def new_window(self,frame):
         self.window = Toplevel(master=frame)
+        self.menubar = Menu(self.window)
         self.window.title(f"AnalysisWindow: {self.filename}")
         self.window.state('zoomed')
     def acquire_data(self):
