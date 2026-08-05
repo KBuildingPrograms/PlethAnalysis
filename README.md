@@ -1,6 +1,6 @@
-##Plethysmography Analysis Beta Build 0.2.5
+**Plethysmography Analysis Beta Build 0.2.5**
 
-#8/5/2026
+*8/5/2026*
 
 This is a simple plethysmography analysis program built for detecting apneas and sighs in mice whole body plethysmography.
 It was built with Python 3.13, and primarily uses Tkinter, Pandas, Polars, Scipy.Signal, and matplotlib for data processing and visualization.
