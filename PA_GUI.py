@@ -46,7 +46,6 @@ class PA_IntroWindow: #first window for taking the ascii file name
             new = Analysis_Window(self.file) #initiates the next window
         elif self.savefile is not None:
             new = Analysis_Savefile(self.savefile)
-        print("does this execute while...")
     def file_selection(self):
         fn =  askopenfilename()
         if ".xlsx" in fn:
@@ -202,7 +201,7 @@ class Controls(Frame):
         
         self.window.bind('<Escape>', escape)
         submit_button = Button(self.window, text="Submit", command=submit)
-        submit_button.place(relx=0.7, rely=0.8)
+        submit_button.place(relx=0.705, rely=0.795)
     def edit_info(self,main):
         event_list = main.events_dataframe.values.tolist()
         cb = ttk.Combobox(self.window, values=event_list)
@@ -214,26 +213,27 @@ class Controls(Frame):
             cb.destroy()
             start_var = DoubleVar(self.window, value=event_edited[1])
             time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
-            time_entry.place(relx=0.62,rely=0.8)
+            time_entry.place(relx=0.5,rely=0.75)
 
             duration_var = DoubleVar(self.window, value=event_edited[2])
             duration_entry = Entry(self.window,textvariable=duration_var,font=('calibre',12,'normal'))
-            duration_entry.place(relx=0.65,rely=0.75)
+            duration_entry.place(relx=0.6,rely=0.75)
 
             types = ['1/2','3','N/A']
             cb_type = ttk.Combobox(self.window, values=types)
             cb_type.set("Type?")
-            cb_type.place(relx=0.7,rely=0.75)
+            cb_type.place(relx=0.75,rely=0.75)
 
-            sub_events = main.apneas
+            sub_events = main.apneas.copy()
             sub_events.insert(0,'')
             cb_subapnea = ttk.Combobox(self.window, values=sub_events)
             cb_subapnea.set("Sub Apbeas?")
-            cb_subapnea.place(relx=0.75,rely=0.75)
+            cb_subapnea.place(relx=0.85,rely=0.75)
             submit_button.destroy()
             def submit_edits():
-                new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()]), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[cb_subapnea.get()])}
-                main.input_event = new_events.get(event_list[event_edited[0]], None)
+                new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[main.events_dataframe.iloc[cb_subapnea.current()-1]] if cb_subapnea.current()>0 else []), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[main.events_dataframe.iloc[cb_subapnea.current()-1]] if cb_subapnea.current()>0 else [])}
+                key = 'Apnea' if 'Apnea' in event_list[event_loc] else 'Sigh' if 'Sigh' in event_list[event_loc] else None
+                main.input_event = new_events.get(key, None)
                 main.event_loc = event_loc
                 main.edit_event()
 
@@ -251,14 +251,14 @@ class Controls(Frame):
                 submit_edit_button.destroy()
             self.window.bind('<Escape>', escape2)
             submit_edit_button = Button(self.window, text="Submit Edits", command=submit_edits)
-            submit_edit_button.place(relx=0.7, rely=0.9)
+            submit_edit_button.place(relx=0.7, rely=0.8)
         def escape(event):
             cb.destroy()
             submit_button.destroy()
         
         self.window.bind('<Escape>', escape)
         submit_button = Button(self.window, text="Submit", command=submit_loc)
-        submit_button.place(relx=0.7, rely=0.8)
+        submit_button.place(relx=0.6, rely=0.895)
 
 
     
@@ -297,6 +297,7 @@ class Analysis_Window:
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
+        print(self.apneas)
 
     def new_window(self,frame):
         self.window = Toplevel(master=frame)
@@ -326,25 +327,25 @@ class Analysis_Window:
         self.event_table.update()
         self.event_table.show()
     def summon_graph(self):
-            self.axes.clear()
-            self.axes.set_xlim(left=self.subsection_data['Time'].iloc[0],right=self.subsection_data['Time'].iloc[-1])
-            self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
-            self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
-            self.canvas.draw()
-            fitting_items = (row for row in self.events_dataframe.itertuples() if self.main_data['Time'].iloc[0]-5 < row.Start < self.subsection_data['Time'].iloc[-1])
-            for row in fitting_items:
-                if row.Event == 'Sigh': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='lightblue')
-                if row.Event == 'Apnea': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='red')
-                if len(row.Subapneas) > 0: 
-                    try:
-                        for subapnea in row.Subapneas: self.axes.axvspan(subapnea.start_time,subapnea.width,alpha=0.3,color='cyan')
-                    except:
-                        pass
-            self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange',grid=True)
-            toolbar = NavigationToolbar2Tk(self.canvas, self.window)
-            toolbar.update()
-            toolbar.place(relx=0.5,rely=0.6,anchor='c')
-            self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
+        self.axes.clear()
+        self.axes.set_xlim(left=self.subsection_data['Time'].iloc[0],right=self.subsection_data['Time'].iloc[-1])
+        self.subsection_data.plot(x='Time',y='Flow',ax=self.axes,grid=True)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
+        self.canvas.draw()
+        fitting_items = (row for row in self.events_dataframe.itertuples() if self.main_data['Time'].iloc[0]-5 < row.Start < self.subsection_data['Time'].iloc[-1])
+        for row in fitting_items:
+            if row.Event == 'Sigh': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='lightblue')
+            if row.Event == 'Apnea': self.axes.axvspan(row.Start,row.Duration+row.Start,alpha=0.3,color='red')
+            if len(row.Subapneas) > 0: 
+                try:
+                    for subapnea in row.Subapneas: self.axes.axvspan(subapnea.start_time,subapnea.width,alpha=0.3,color='cyan')
+                except:
+                    pass
+        self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange',grid=True)
+        toolbar = NavigationToolbar2Tk(self.canvas, self.window)
+        toolbar.update()
+        toolbar.place(relx=0.5,rely=0.6,anchor='c')
+        self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
         new_events = self.events_dataframe.tail(new).copy()
@@ -366,31 +367,32 @@ class Analysis_Window:
     def removal_loc(self):
         self.controls.del_info(self)
     def remove_event(self):
-        key_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
-        key_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc] == apnea.start_time]
-        if key_a:
+        key_s = [sigh for sigh in self.sighs if pa.np.isclose(self.events_dataframe['Start'].iloc[self.event_loc],sigh.start_time,atol=1e-5)]
+        key_a = [apnea for apnea in self.apneas if pa.np.isclose(self.events_dataframe['Start'].iloc[self.event_loc],apnea.start_time,atol=1e-5)]
+        if len(key_a)>0:
             self.apneas.pop(self.apneas.index(key_a[0]))
-        if key_s:
+        if len(key_s)>0:
             self.sighs.pop(self.apneas.index(key_s[0]))
-        self.events_dataframe.drop([self.event_loc])
+        self.events_dataframe.drop(index=[self.event_loc],inplace=True)
+        print(self.events_dataframe)
         self.event_loc = None
         self.display_events()
         self.refresh()
     def edit_loc(self):
         self.controls.edit_info(self)
     def edit_event(self):
-        old_a = [apnea for apnea in self.apneas if self.events_dataframe['Start'].iloc[self.event_loc] == apnea.start_time]
-        old_s = [sigh for sigh in self.sighs if self.events_dataframe['Start'].iloc[self.event_loc] == sigh.start_time]
-        if old_a:
+        old_a = [apnea for apnea in self.apneas if pa.np.isclose(self.events_dataframe['Start'].iloc[self.event_loc],apnea.start_time,atol=1e-5)]
+        old_s = [sigh for sigh in self.sighs if pa.np.isclose(self.events_dataframe['Start'].iloc[self.event_loc],sigh.start_time,atol=1e-5)]
+        if len(old_a)>0:
             pa.editinlists(old_a[0], self.events_dataframe)
             inner_index = self.apneas.index(old_a[0]) 
             self.apneas.pop(inner_index)
-            self.apneas.insert(inner_index)
-        if old_s:
+            self.apneas.insert(inner_index,self.input_event)
+        if len(old_s)>0:
             pa.editinlists(old_s[0], self.events_dataframe)
             inner_index = self.sighs.index(old_s[0]) 
             self.sighs.pop(inner_index)
-            self.sighs.insert(inner_index)
+            self.sighs.insert(inner_index,self.input_event)
         self.event_loc = None
         self.input_event = None
     def reset(self):

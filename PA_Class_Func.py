@@ -182,7 +182,7 @@ def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the pea
     copy = copy.sort_values(by=['Height'],ascending=False)
     row = copy.head(1).copy()
     inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
-    if -row['Height'].iloc[0] < 0.98*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 0.7*peak_area_mean and len(inverse)>0:
+    if -row['Height'].iloc[0] < 0.98*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 0.8*peak_area_mean and len(inverse)>0:
                 new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
                 sighs.append(new_sigh)
     return sighs, peak_dataframe
