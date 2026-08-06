@@ -2,7 +2,6 @@ from tkinter import *
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 import math
-import threading
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -23,26 +22,12 @@ class PA_IntroWindow: #first window for taking the ascii file name
         t.insert('1.0',message)
         t.grid(row=0,column=0)
 
-        self.file_var = StringVar() #file name tkinter string
-        self.file_label = Label(self.window,text="Paste Filename Here:",font=('calibre',15,'bold')) #prompts the user for the filename
-        self.file_label.grid(row=1,column=0)
-        self.file_entry = Entry(self.window, textvariable=self.file_var,font=('calibre',15,'normal')) #allows the user to enter the filename
-        self.file_entry.grid(row=1,column=1)
-
-        self.savefile_var = StringVar()
-        self.savefile_label = Label(self.window,text="Paste Savefile Name Here:",font=('calibre',15,'bold'))
-        self.savefile_label.grid(row=2,column=0)
-        self.savefile_entry = Entry(self.window, textvariable=self.savefile_var,font=('calibre',15,'normal'))
-        self.savefile_entry.grid(row=2,column=1)
-
-        self.submit = Button(self.window, text="Submit", command=self.file_name) #submits the contents of the textbox to a section that may activate the next window
-        self.submit.grid(row=3,column=1)
-
         self.open_explorer = Button(self.window, text='Open File Folder', command=self.file_selection)
-        self.open_explorer.grid(row=3,column=0)
+        self.open_explorer.grid(row=1,column=0)
         self.file = None
         self.savefile = None
     def summon_window(self): #summons the next window
+
         if self.file is not None:
             new = Analysis_Window(self.file) #initiates the next window
         elif self.savefile is not None:
@@ -180,16 +165,18 @@ class Controls(Frame):
             cb_type.destroy()
             cb_subapnea.destroy()
             submit_button.destroy()
-        def escape(event):
+        def escape():
             cb.destroy()
             time_entry.destroy()
             duration_entry.destroy()
             cb_type.destroy()
             cb_subapnea.destroy()
             submit_button.destroy()
+            escape_button.destroy()
         
-        self.window.bind('<Escape>', escape)
         submit_button = Button(self.window, text="Submit Event", command=submit)
+        escape_button = Button(self.window, text="x", command=escape)
+        escape_button.place(relx=0.9,rely=0.7)
         submit_button.place(relx=0.75,rely=0.85)
     def del_info(self, main):
         event_list = list(range(1,len(main.events_dataframe)+1))
@@ -202,11 +189,14 @@ class Controls(Frame):
             cb.destroy()
             submit_button.destroy()
             main.remove_event()
-        def escape(event):
+        def escape():
             cb.destroy()
             submit_button.destroy()
+            escape_button.destroy()
         
-        self.window.bind('<Escape>', escape)
+    
+        escape_button = Button(self.window, text="x", command=escape)
+        escape_button.place(relx=0.9,rely=0.7)
         submit_button = Button(self.window, text="Submit", command=submit)
         submit_button.place(relx=0.705, rely=0.795)
     def edit_info(self,main):
@@ -249,21 +239,25 @@ class Controls(Frame):
                 cb_type.destroy()
                 cb_subapnea.destroy()
                 submit_edit_button.destroy()
-            def escape2(event):
+            def escape2():
                 cb.destroy()
                 time_entry.destroy()
                 duration_entry.destroy()
                 cb_type.destroy()
                 cb_subapnea.destroy()
                 submit_edit_button.destroy()
-            self.window.bind('<Escape>', escape2)
+                escape_button2.destroy()
+            escape_button2 = Button(self.window, text="x", command=escape2)
+            escape_button2.place(relx=0.9,rely=0.7)
             submit_edit_button = Button(self.window, text="Submit Edits", command=submit_edits)
             submit_edit_button.place(relx=0.7, rely=0.8)
-        def escape(event):
+        def escape():
             cb.destroy()
             submit_button.destroy()
+            escape_button.destroy()
         
-        self.window.bind('<Escape>', escape)
+        escape_button = Button(self.window, text="x", command=escape)
+        escape_button.place(relx=0.9,rely=0.7)
         submit_button = Button(self.window, text="Submit", command=submit_loc)
         submit_button.place(relx=0.6, rely=0.895)
 
@@ -281,18 +275,26 @@ class Settings_Window:
 
 class Analysis_Window:
     def __init__(self, filename):
+        wait_label = None
         self.filename = filename
-        self.new_window(window) #makes a new window based off of the master Tk window
-        self.width = self.window.winfo_width() #takes the width 
-        self.height = self.window.winfo_height() #and height of the current window for future reference
         self.iter = 0
+        self.total = None
+        if '.ascii' in filename: 
+            wait_label = Label(window, text="Ascii detected, file conversion loading...",font=('calibri',15,'bold'))
+            wait_label.grid(row=0,column=2)
+        self.acquire_data()
+        if wait_label: wait_label.destroy()
+        self.new_window(window) #makes a new window based off of the master Tk window
+        window.update_idletasks()
+        self.width = self.window.winfo_width() #takes the width 
+        self.height = self.window.winfo_height() #and height of the current window for future reference 
         self.skiprows = pa.skiprows(self.iter)
         
         self.toolbar = None
-        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/2)) #frame for the list of all events
-        self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
-
-        self.total = None
+        self.events_dataframe = pa.pd.DataFrame({'Event':[],'Start':[],'Duration':[],'Type':[],'Questionable':[],'Subapneas':[]})
+        self.event_frame = Frame(self.window, width=self.width//2.5, height=self.height//3) #frame for the list of all events
+        self.event_table = None
+        self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
         
         self.input_event = None
         self.event_loc = None
@@ -306,8 +308,7 @@ class Analysis_Window:
         self.sighareatolerance = None
         self.sighheighttolerance = None
 
-        self.acquire_data()
-        self.controls = Controls(self)
+        
         self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
         self.axes = self.fig.add_subplot()
         self.analyze_data() #sends the 10 second interval through standard analysis
@@ -316,13 +317,15 @@ class Analysis_Window:
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
-
+        self.controls = Controls(self)
+        # self.event_table.show()
 
     def new_window(self,frame):
         self.window = Toplevel(master=frame)
         self.menubar = Menu(self.window)
         self.window.title(f"AnalysisWindow: {self.filename}")
-        self.window.state('zoomed')
+        self.window.geometry("1400x770")
+        self.window.resizable(False,False)
     def acquire_data(self):
         self.skiprows = pa.skiprows(self.iter) #take the rows that are needed to skip based on the iteration at the time
         if self.total is not None:
@@ -342,8 +345,11 @@ class Analysis_Window:
         for event in new_events:
             self.events_dataframe = pa.pd.concat([self.events_dataframe,pa.pd.DataFrame({'Event':[event[0]],'Start':[event[1]],'Duration':[event[2]],'Type':[event[3]],'Questionable':[event[4]],'Subapneas':[event[5]]})],ignore_index=True)
     def display_events(self):
-        self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=True)
-        self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
+        if self.events_dataframe.empty:
+            dummy_frame = pa.pd.DataFrame({'Event':['N/A'],'Start':['N/A'],'Duration':['N/A'],'Type':['N/A'],'Questionable':['N/A'],'Subapneas':['N/A']})
+            self.event_table = Table(self.event_frame, dataframe=dummy_frame, showtoolbar=False, showstatusbar=True,width=self.width//3,height=self.height//3)
+        else:
+            self.event_table = Table(self.event_frame, dataframe=self.events_dataframe, showtoolbar=False, showstatusbar=True,width=self.width//3,height=self.height//3)
         self.event_table.update()
         self.event_table.show()
     def summon_graph(self):
@@ -393,7 +399,7 @@ class Analysis_Window:
         if len(key_a)>0:
             self.apneas.pop(self.apneas.index(key_a[0]))
         if len(key_s)>0:
-            self.sighs.pop(self.apneas.index(key_s[0]))
+            self.sighs.pop(self.sighs.index(key_s[0]))
         self.events_dataframe.drop(index=[self.event_loc],inplace=True)
         print(self.events_dataframe)
         self.event_loc = None
@@ -455,12 +461,13 @@ class Analysis_Window:
         self.save()
         if self.savefile_path:
             warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',12,'bold'))
-            warning_label.place(relx=0.7,rely=0.9)
+            warning_label.place(relx=0.65,rely=0.9)
             plt.close(self.fig)
             self.events_dataframe = pa.large_data_process(self.total,self.iter,self.heightref)
             print(self.events_dataframe)
             self.updatesave()
     def save(self):
+        self.filename = self.filename.replace(".ascii",".parquet") if '.ascii' in self.filename else self.filename
         savefile_data = {"Filename": [self.filename], "Current Iteration": [self.iter]}
         savefile_dataframe = pa.pd.DataFrame(data=savefile_data)
         self.savefile_path = asksaveasfilename(defaultextension=".xlsx",filetypes=[("Excel Workbook","*.xlsx")],title="Save Your Document As")

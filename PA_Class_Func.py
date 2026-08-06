@@ -3,6 +3,7 @@ import polars as pl
 import pandas as pd
 import numpy as np
 import tqdm
+import ASCII_to_Parquet as ap
 
 class Apnea:
     def __init__(self,type,start_time,duration,subapnea=None):
@@ -125,8 +126,8 @@ def signal_prep(signal_name,skiprows):
         total_pleth = pl.read_parquet(signal_name,columns=["Time","Flow"])
         pleth_section = total_pleth.slice(skiprows,Nrows).to_pandas()
     if ".ascii" in signal_name:
-        total_pleth = None
-        pleth_section = pd.read_csv(pleth_graph_ascii, sep="\\s+",index_col=False, skiprows=skiprows, nrows=Nrows, header=27, names=["Time","Flow"])
+        total_pleth = ap.switch_data(filename=signal_name)
+        pleth_section = total_pleth.slice(skiprows,Nrows).to_pandas()
         #^ converts ascii data to pd.dataframe
     normalized_signal = pleth_section.copy().astype('float32')
     #normalized_signal["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
@@ -183,7 +184,7 @@ def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the pea
     copy = copy.sort_values(by=['Height'],ascending=False)
     row = copy.head(1).copy()
     inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
-    if -row['Height'].iloc[0] < 0.98*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 0.95*peak_area_mean and len(inverse)>0:
+    if -row['Height'].iloc[0] < 0.97*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 1.05*peak_area_mean and len(inverse)>0:
                 new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
                 sighs.append(new_sigh)
     return sighs, peak_dataframe
