@@ -184,7 +184,7 @@ def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the pea
     copy = copy.sort_values(by=['Height'],ascending=False)
     row = copy.head(1).copy()
     inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
-    if -row['Height'].iloc[0] < 0.97*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 1.05*peak_area_mean and len(inverse)>0:
+    if -row['Height'].iloc[0] < 0.96*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 1.05*peak_area_mean and len(inverse)>0:
                 new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
                 sighs.append(new_sigh)
     return sighs, peak_dataframe
@@ -267,7 +267,6 @@ def large_data_process(total_data,iter,height_ref=None):
         for i in full_range:
             skip_rows = skiprows(i)
             pleth_section = total_data.slice(skip_rows,Nrows).to_pandas()
-            pleth_section["Flow"] = (pleth_section["Flow"]-pleth_section["Flow"].mean())/pleth_section["Flow"].std()
             pleth_ten_section = pleth_section.head(int(len(pleth_section)*0.5)).copy() 
             sigh_container, _ = find_sighs(pleth_section,skip_rows,height_ref)
             new_sigh = sigh_container[-1] if len(sigh_container) > 0 and pleth_ten_section['Time'].iloc[0] < sigh_container[-1].start_time < pleth_ten_section['Time'].iloc[-1] else None
