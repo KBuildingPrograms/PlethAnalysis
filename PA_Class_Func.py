@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import tqdm
 
+
 class Apnea:
     def __init__(self,type,start_time,duration,subapnea=None):
         self.name = "Apnea"
@@ -275,4 +276,3 @@ def large_data_process(total_data,iter,height_ref=None):
             apnea_container = apnea_combination(pleth_section,skip_rows,apnea_container)
             events_container = eventstoframe(events_container,sigh_container,apnea_container)
     return events_container
-
