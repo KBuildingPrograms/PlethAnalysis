@@ -288,8 +288,8 @@ class Analysis_Window:
         self.iter = 0
         self.skiprows = pa.skiprows(self.iter)
         
-
-        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
+        self.toolbar = None
+        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/2)) #frame for the list of all events
         self.events_dataframe = pa.pd.DataFrame(columns=["Event","Start","Duration","Type","Questionable","Subapneas"])
 
         self.total = None
@@ -311,12 +311,11 @@ class Analysis_Window:
         self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
         self.axes = self.fig.add_subplot()
         self.analyze_data() #sends the 10 second interval through standard analysis
-        #if self.total is not None: self.total_heightref = pa.total_deviation(self.total)
-        #print(self.total_heightref)
+        #if self.total is not None: self.heightref = pa.total_deviation(self.total)
+        #print(self.heightref)
         self.concatenate_data()
         self.display_events() #display the list of events from the events dataframe
         self.summon_graph()
-        self.event_table.redraw()
 
 
     def new_window(self,frame):
@@ -331,10 +330,10 @@ class Analysis_Window:
         else:
             self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref)
+        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.heightref)
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
-        self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:12*2000],self.skiprows,new_sigh,self.total_heightref)) 
+        self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:12*2000],self.skiprows,new_sigh,self.heightref)) 
         self.apneas = pa.apnea_combination(self.main_data,self.skiprows,self.apneas)
     def concatenate_data(self):
         chunk_s = [sigh for sigh in self.sighs if self.subsection_data['Time'].iloc[0] < sigh.start_time < self.main_data['Time'].iloc[13*2000] and not pa.np.isclose(self.events_dataframe['Start'],sigh.start_time,atol=1e-5).any()]
@@ -363,9 +362,10 @@ class Analysis_Window:
                 except:
                     pass
         self.peaks.plot.scatter(x='Time',y='Height',ax=self.axes,color='orange',grid=True)
-        toolbar = NavigationToolbar2Tk(self.canvas, self.window)
-        toolbar.update()
-        toolbar.place(relx=0.5,rely=0.6,anchor='c')
+        if self.toolbar is None:
+            self.toolbar = NavigationToolbar2Tk(self.canvas, self.window)
+        self.toolbar.update()
+        #toolbar.place(relx=0.5,rely=0.6,anchor='c')
         self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
@@ -435,7 +435,7 @@ class Analysis_Window:
     def back(self):
         if self.iter > 0: self.iter -= 1
         self.acquire_data()
-        _, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.total_heightref)
+        _, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.heightref)
         self.refresh()
     def next_process(self):
         self.acquire_data()
@@ -457,7 +457,7 @@ class Analysis_Window:
             warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',12,'bold'))
             warning_label.place(relx=0.7,rely=0.9)
             plt.close(self.fig)
-            self.events_dataframe = pa.large_data_process(self.total,self.iter,self.total_heightref)
+            self.events_dataframe = pa.large_data_process(self.total,self.iter,self.heightref)
             print(self.events_dataframe)
             self.updatesave()
     def save(self):
