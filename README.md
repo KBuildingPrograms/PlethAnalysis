@@ -1,4 +1,4 @@
-**Plethysmography Analysis Beta Build 0.2.5**
+**Plethysmography Analysis Beta Build 0.4.2**
 
 *8/5/2026*
 
