@@ -474,9 +474,9 @@ class Analysis_Window:
         self.refresh()
     def runthrough(self):
         self.save()
-        warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',12,'bold'))
+        warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',11,'bold'))
+        warning_label.place(relx=0.6,rely=0.9)
         if self.savefile_path:
-            warning_label.place(relx=0.6,rely=0.9)
             plt.close(self.fig)
             self.events_dataframe = pa.large_data_process(self.total,self.iter,self.heightref)
             print(self.events_dataframe)
