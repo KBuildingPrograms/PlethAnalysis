@@ -118,6 +118,8 @@ class Controls(Frame):
 
         settings = Menu(main.menubar,tearoff=0)
         main.menubar.add_cascade(label='Settings',menu=settings)
+        settings.add_command(label='Adjust Tolerances',command=main.settingswindow)
+
         #Add all adjustment commands here
         #I think I'm going to add a new window for settings
             #and add settings to the savefile
@@ -152,7 +154,7 @@ class Controls(Frame):
 
         sub_events = ['None']+main.apneas
         cb_subapnea = ttk.Combobox(self.window, values=sub_events)
-        cb_subapnea.set("Sub Apbeas?")
+        cb_subapnea.set("Sub Apneas?")
         cb_subapnea.place(relx=0.85,rely=0.8)
 
         def submit():
@@ -165,6 +167,7 @@ class Controls(Frame):
             cb_type.destroy()
             cb_subapnea.destroy()
             submit_button.destroy()
+            escape_button.destroy()
         def escape():
             cb.destroy()
             time_entry.destroy()
@@ -176,7 +179,7 @@ class Controls(Frame):
         
         submit_button = Button(self.window, text="Submit Event", command=submit)
         escape_button = Button(self.window, text="x", command=escape)
-        escape_button.place(relx=0.9,rely=0.7)
+        escape_button.place(relx=0.95,rely=0.7)
         submit_button.place(relx=0.75,rely=0.85)
     def del_info(self, main):
         event_list = list(range(1,len(main.events_dataframe)+1))
@@ -188,6 +191,7 @@ class Controls(Frame):
             main.event_loc = loc
             cb.destroy()
             submit_button.destroy()
+            escape_button.destroy()
             main.remove_event()
         def escape():
             cb.destroy()
@@ -196,17 +200,18 @@ class Controls(Frame):
         
     
         escape_button = Button(self.window, text="x", command=escape)
-        escape_button.place(relx=0.9,rely=0.7)
+        escape_button.place(relx=0.95,rely=0.7)
         submit_button = Button(self.window, text="Submit", command=submit)
         submit_button.place(relx=0.705, rely=0.795)
     def edit_info(self,main):
-        event_list = main.events_dataframe.values.tolist()
+        event_list = list(range(1,len(main.events_dataframe)+1))
         cb = ttk.Combobox(self.window, values=event_list)
         cb.set("Event to Edit")
         cb.place(relx=0.5, rely=0.9)
         def submit_loc():
             event_loc = cb.current() - 1
-            event_edited = event_list[event_loc]
+            true_list = main.events_dataframe.values.to_list()
+            event_edited = true_list[event_loc]
             cb.destroy()
             start_var = DoubleVar(self.window, value=event_edited[1])
             time_entry = Entry(self.window,textvariable=start_var,font=('calibre',12,'normal'))
@@ -224,8 +229,9 @@ class Controls(Frame):
             sub_events = main.apneas.copy()
             sub_events.insert(0,'')
             cb_subapnea = ttk.Combobox(self.window, values=sub_events)
-            cb_subapnea.set("Sub Apbeas?")
+            cb_subapnea.set("Sub Apneas?")
             cb_subapnea.place(relx=0.85,rely=0.75)
+            escape_button.destroy()
             submit_button.destroy()
             def submit_edits():
                 new_events = {'Apnea': pa.Apnea(cb_type.get(),start_var.get(),duration_var.get(),subapnea=[main.events_dataframe.iloc[cb_subapnea.current()-1]] if cb_subapnea.current()>0 else []), 'Sigh': pa.Sigh(start_var.get(),duration_var.get(),subapnea=[main.events_dataframe.iloc[cb_subapnea.current()-1]] if cb_subapnea.current()>0 else [])}
@@ -239,6 +245,7 @@ class Controls(Frame):
                 cb_type.destroy()
                 cb_subapnea.destroy()
                 submit_edit_button.destroy()
+                escape_button2.destroy()
             def escape2():
                 cb.destroy()
                 time_entry.destroy()
@@ -248,7 +255,7 @@ class Controls(Frame):
                 submit_edit_button.destroy()
                 escape_button2.destroy()
             escape_button2 = Button(self.window, text="x", command=escape2)
-            escape_button2.place(relx=0.9,rely=0.7)
+            escape_button2.place(relx=0.95,rely=0.7)
             submit_edit_button = Button(self.window, text="Submit Edits", command=submit_edits)
             submit_edit_button.place(relx=0.7, rely=0.8)
         def escape():
@@ -257,7 +264,7 @@ class Controls(Frame):
             escape_button.destroy()
         
         escape_button = Button(self.window, text="x", command=escape)
-        escape_button.place(relx=0.9,rely=0.7)
+        escape_button.place(relx=0.95,rely=0.7)
         submit_button = Button(self.window, text="Submit", command=submit_loc)
         submit_button.place(relx=0.6, rely=0.895)
 
@@ -269,7 +276,13 @@ class Settings_Window:
         self.example_axes = self.example_fig.add_subplot()
     def load_sliders(self,main):
         current_height = DoubleVar(value=main.heightref)
-        peak_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal',)
+        peak_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        current_inverseheight = DoubleVar(value=main.inverseheightref)
+        inverse_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        current_areatolerance = DoubleVar(value=main.sighareatolerance)
+        areatolerance_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        current_heighttolerance = DoubleVar(value=main.sighheighttolerance)
+        heighttolerance_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
         
     
 
@@ -373,6 +386,8 @@ class Analysis_Window:
         self.toolbar.update()
         #toolbar.place(relx=0.5,rely=0.6,anchor='c')
         self.canvas.get_tk_widget().place(relx=0.5,rely=0.0,anchor="n")
+    def settingswindow(self):
+        settings_window =Settings_Window(self)
     def update_events(self):
         new = len(self.apneas) + len(self.sighs) - len(self.events_dataframe)
         new_events = self.events_dataframe.tail(new).copy()
@@ -459,13 +474,14 @@ class Analysis_Window:
         self.refresh()
     def runthrough(self):
         self.save()
+        warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',12,'bold'))
         if self.savefile_path:
-            warning_label = Label(self.window,text="Process Running, leave GUI windows alone, check the Terminal to see the progress",font=('calibre',12,'bold'))
-            warning_label.place(relx=0.65,rely=0.9)
+            warning_label.place(relx=0.6,rely=0.9)
             plt.close(self.fig)
             self.events_dataframe = pa.large_data_process(self.total,self.iter,self.heightref)
             print(self.events_dataframe)
             self.updatesave()
+        warning_label.destroy()
     def save(self):
         self.filename = self.filename.replace(".ascii",".parquet") if '.ascii' in self.filename else self.filename
         savefile_data = {"Filename": [self.filename], "Current Iteration": [self.iter]}
@@ -491,16 +507,31 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.file_var = filename
         self.acquire_savedata()
         self.new_window(window) #makes a new window based off of the master Tk window
+        window.update_idletasks()
         self.width = self.window.winfo_width() #takes the width 
         self.height = self.window.winfo_height() #and height of the current window for future reference
-        self.event_frame = Frame(self.window, width=int(self.width/3), height=int(self.height/4)) #frame for the list of all events
-        
+
+        self.toolbar = None
+        self.event_frame = Frame(self.window, width=self.width//2.5, height=self.height//3) #frame for the list of all events
+        self.event_table = None
+        self.event_frame.place(relx=0.0,rely=1.0,anchor="sw")
+
         self.apneas = pa.frametoapnea(self.events_dataframe)
         self.sighs = pa.frametosighs(self.events_dataframe)
 
         self.total = None
         self.input_event = None
         self.event_loc = None
+
+        self.hour_var = None
+        self.minute_var = None
+        self.second_var = None
+        
+        self.heightref = None
+        self.inverseheightref = None
+        self.sighareatolerance = None
+        self.sighheighttolerance = None
+        
 
         self.hour_var = IntVar()
         self.minute_var = IntVar()
