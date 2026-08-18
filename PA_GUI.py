@@ -272,17 +272,37 @@ class Settings_Window:
     def __init__(self,main):
         self.main_ref = main
         self.frame = Toplevel(master=window)
+        self.frame.geometry("600x400")
         self.example_fig = Figure(figsize=(8,4),dpi=90,linewidth=0.1)
         self.example_axes = self.example_fig.add_subplot()
+        self.slider_frame = Frame(master=self.frame,width=200,height=400)
     def load_sliders(self,main):
-        current_height = DoubleVar(value=main.heightref)
-        peak_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
-        current_inverseheight = DoubleVar(value=main.inverseheightref)
-        inverse_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
-        current_areatolerance = DoubleVar(value=main.sighareatolerance)
-        areatolerance_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
-        current_heighttolerance = DoubleVar(value=main.sighheighttolerance)
-        heighttolerance_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        self.current_height = DoubleVar(value=main.heightref)
+        self.peak_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        self.current_inverseheight = DoubleVar(value=main.inverseheightref)
+        self.inverse_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        self.current_areatolerance = DoubleVar(value=main.sighareatolerance)
+        self.areatolerance_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        self.current_heighttolerance = DoubleVar(value=main.sighheighttolerance)
+        self.heighttolerance_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+
+        self.peak_height_slider.set(self.current_height)
+        self.inverse_height_slider.set(self.current_inverseheight)
+        self.areatolerance_slider.set(self.current_areatolerance)
+        self.heighttolerance_slider.set(self.current_heighttolerance)
+
+
+        self.peak_height_slider.pack(self.slider_frame,side=TOP)
+        self.inverse_height_slider.pack(self.slider_frame,side=TOP)
+        self.areatolerance_slider.pack(self.slider_frame,side=TOP)
+        self.heighttolerance_slider.pack(self.slider_frame,side=TOP)
+    def load_minimap(self,main):
+        main.subsection_data.plot(x='Time',y='Flow',ax=self.example_axes,grid=True)
+        self.canvas = FigureCanvasTkAgg(self.example_fig, master=self.frame)
+        self.canvas.draw()
+        normal_peaks, inverse_peaks, _, _, = pa.peak_analysis(main.subsection_data,main.skiprows)
+        normal_peaks.plot.scatter(x='Time',y='Height',ax=self.example_axes)
+        self.example_axes.scatter(x=inverse_peaks['Time'],y=inverse_peaks['Height'],color='green')
         
     
 

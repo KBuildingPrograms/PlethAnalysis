@@ -162,8 +162,11 @@ def peak_analysis(normalized_signal,skiprows,height_ref=None):
     sampling_freq = 1/2000
     height = (0.994)*normalized_signal['Flow'].mean() if height_ref==None else height_ref
     pts_peaks_tp = scp.find_peaks(normalized_signal["Flow"], height=height)
+
     pts_inversepeaks = scp.find_peaks(-(normalized_signal["Flow"]-normalized_signal['Flow'].mean()), height=1.4*(height-normalized_signal['Flow'].mean()))
     pts_inversepeaks_loc = pts_inversepeaks[0]*sampling_freq + skiprows*sampling_freq
+    pts_inversepeaks_height = pts_inversepeaks[1]["peak_heights"]
+
     pts_peaks_loc = pts_peaks_tp[0]*sampling_freq + skiprows*sampling_freq
     pts_peaks_w = scp.peak_widths(normalized_signal["Flow"], pts_peaks_tp[0],rel_height=0.6)
     pts_peaks_height = pts_peaks_tp[1]["peak_heights"]
@@ -172,10 +175,10 @@ def peak_analysis(normalized_signal,skiprows,height_ref=None):
 
     ptsp_data = {"Time": pts_peaks_loc, "Height": pts_peaks_height, "Width":pts_peaks_width, "Start": pts_peaks_start}
     ptsp_dataframe = pd.DataFrame(data=ptsp_data)
-    
+    pts_inversedata = {"Time":pts_inversepeaks_loc,"Height":pts_inversepeaks_height}
 
     ptsp_mean, ptsp_area_mean = peak_means(ptsp_dataframe)
-    return ptsp_dataframe, pts_inversepeaks_loc, ptsp_mean, ptsp_area_mean
+    return ptsp_dataframe, pts_inversedata, ptsp_mean, ptsp_area_mean
 
 def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the peak stuff in here to really condense it 
     sighs = []
@@ -183,7 +186,7 @@ def find_sighs(normalized_signal,skiprows,height_ref=None): #i could add the pea
     copy = peak_dataframe.copy(deep=False)
     copy = copy.sort_values(by=['Height'],ascending=False)
     row = copy.head(1).copy()
-    inverse = [x for x in inverse_data if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
+    inverse = [x for x in inverse_data['Time'] if row['Start'].iloc[0]+row['Width'].iloc[0] + 0.05 > x > row['Start'].iloc[0]+row['Width'].iloc[0]]
     if -row['Height'].iloc[0] < 0.96*peak_height_mean and row['Width'].iloc[0]*(-row['Height'].iloc[0]) > 1.05*peak_area_mean and len(inverse)>0:
                 new_sigh = Sigh(row['Start'].iloc[0],row['Width'].iloc[0])
                 sighs.append(new_sigh)
