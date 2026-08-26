@@ -271,14 +271,17 @@ class Controls(Frame):
 class Settings_Window:
     def __init__(self,main):
         self.main_ref = main
-        self.frame = Toplevel(master=window)
+        self.frame = Toplevel(master=main.window)
         self.frame.geometry("600x400")
         self.example_fig = Figure(figsize=(8,4),dpi=90,linewidth=0.1)
         self.example_axes = self.example_fig.add_subplot()
         self.slider_frame = Frame(master=self.frame,width=200,height=400)
+
+        self.save_preference_button = Button(self.frame,text="Save",command=lambda : self.save_preferences(main))
+        self.save_preference_button.place(relx=0.9,rely=0.9)
     def load_sliders(self,main):
         self.current_height = DoubleVar(value=main.heightref)
-        self.peak_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
+        self.peak_height_slider = Scale(self.frame,from_=0,to=1.5,orient='horizontal')
         self.current_inverseheight = DoubleVar(value=main.inverseheightref)
         self.inverse_height_slider = Scale(self.frame,from_=0,to=2,orient='horizontal')
         self.current_areatolerance = DoubleVar(value=main.sighareatolerance)
@@ -303,6 +306,12 @@ class Settings_Window:
         normal_peaks, inverse_peaks, _, _, = pa.peak_analysis(main.subsection_data,main.skiprows)
         normal_peaks.plot.scatter(x='Time',y='Height',ax=self.example_axes)
         self.example_axes.scatter(x=inverse_peaks['Time'],y=inverse_peaks['Height'],color='green')
+    def save_preferences(self,main):
+        main.heightref = self.peak_height_slider.get()
+        main.inverseheightref = self.inverse_height_slider.get()
+        main.sighareatolerance = self.areatolerance_slider.get()
+        self.sighheighttolerance = self.heighttolerance_slider.get()
+
         
     
 
@@ -336,10 +345,10 @@ class Analysis_Window:
         self.minute_var = None
         self.second_var = None
         
-        self.heightref = None
-        self.inverseheightref = None
-        self.sighareatolerance = None
-        self.sighheighttolerance = None
+        self.heightref = 0.994
+        self.inverseheightref = 1.4
+        self.sighareatolerance = 1.05
+        self.sighheighttolerance = 0.96
 
         
         self.fig = Figure(figsize=(14,4), dpi=110,linewidth=0.3)
@@ -366,7 +375,7 @@ class Analysis_Window:
         else:
             self.total, self.main_data, self.subsection_data = pa.signal_prep(self.filename,self.skiprows) #acquire the 20 second and 10 second interval
     def analyze_data(self):
-        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.heightref)
+        self.sighs, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,height_ref = self.heightref,inverseheight_ref=self.inverseheightref,sighareatolerance=self.sighareatolerance,sighheighttolerance=self.sighheighttolerance)
         new_sigh = self.sighs[-1] if len(self.sighs) > 0 and (float(self.subsection_data['Time'].iloc[0]) < self.sighs[-1].start_time < float(self.subsection_data['Time'].iloc[-1])) else None
         self.apneas = pa.apnea_detection(self.main_data,self.subsection_data,self.skiprows,sigh=new_sigh)
         self.apneas += (pa.quick_apnea(self.subsection_data,self.main_data.iloc[9*2000:12*2000],self.skiprows,new_sigh,self.heightref)) 
@@ -476,7 +485,7 @@ class Analysis_Window:
     def back(self):
         if self.iter > 0: self.iter -= 1
         self.acquire_data()
-        _, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.heightref)
+        _, self.peaks = pa.find_sighs(self.subsection_data,self.skiprows,self.heightref,self.inverseheightref)
         self.refresh()
     def next_process(self):
         self.acquire_data()
@@ -547,10 +556,10 @@ class Analysis_Savefile(Analysis_Window): #Moving some of the analysis methods t
         self.minute_var = None
         self.second_var = None
         
-        self.heightref = None
-        self.inverseheightref = None
-        self.sighareatolerance = None
-        self.sighheighttolerance = None
+        self.heightref = 0.994
+        self.inverseheightref = 1.4
+        self.sighareatolerance = 1.05
+        self.sighheighttolerance = 0.96
         
 
         self.hour_var = IntVar()
